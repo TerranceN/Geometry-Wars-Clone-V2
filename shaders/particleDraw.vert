@@ -1,3 +1,5 @@
+#version 140
+
 in vec2 aCoord;
 
 out vec2 texCoord;
