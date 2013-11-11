@@ -29,7 +29,8 @@ class GBuffer {
 
   var isSetup = false
 
-  var numParticles = 50
+  var numParticlesWidth = 50
+  var numParticlesHeight = 50
 
   var vbo = glGenBuffers()
   var drawVBO = glGenBuffers()
@@ -49,7 +50,8 @@ class GBuffer {
   def setup(screenWidth:Int, screenHeight:Int, numParticles:Int) {
     this.screenWidth = screenWidth
     this.screenHeight = screenHeight
-    this.numParticles = numParticles
+    numParticlesWidth = numParticles
+    numParticlesHeight = numParticles
 
     if (!isSetup) {
       loadShaders()
@@ -62,9 +64,11 @@ class GBuffer {
   }
 
   def setupDrawVBO() {
-    val vertexBuffer = BufferUtils.createFloatBuffer(numParticles * 2)
-    for (i <- 0 until numParticles) {
-      vertexBuffer.put(i); vertexBuffer.put(i)
+    val vertexBuffer = BufferUtils.createFloatBuffer(numParticlesWidth * numParticlesHeight * 2)
+    for (i <- 0 until numParticlesWidth) {
+      for (j <- 0 until numParticlesHeight) {
+        vertexBuffer.put(i); vertexBuffer.put(j)
+      }
     }
     vertexBuffer.flip()
 
@@ -77,13 +81,13 @@ class GBuffer {
     vertexBuffer.put( 0.0f); vertexBuffer.put( 0.0f)
     vertexBuffer.put( 0.0f); vertexBuffer.put( 1.0f)
 
-    vertexBuffer.put(numParticles); vertexBuffer.put(0.0f)
+    vertexBuffer.put(numParticlesWidth); vertexBuffer.put(0.0f)
     vertexBuffer.put( 1.0f); vertexBuffer.put( 1.0f)
 
-    vertexBuffer.put(numParticles); vertexBuffer.put( 1.0f)
+    vertexBuffer.put(numParticlesWidth); vertexBuffer.put(numParticlesHeight)
     vertexBuffer.put( 1.0f); vertexBuffer.put( 0.0f)
 
-    vertexBuffer.put( 0.0f); vertexBuffer.put( 1.0f)
+    vertexBuffer.put( 0.0f); vertexBuffer.put(numParticlesHeight)
     vertexBuffer.put( 0.0f); vertexBuffer.put( 0.0f)
     vertexBuffer.flip()
 
@@ -110,8 +114,8 @@ class GBuffer {
     fbo = glGenFramebuffers()
     glBindFramebuffer(GL_FRAMEBUFFER, fbo)
 
-    var initPositions = BufferUtils.createFloatBuffer(numParticles * 4)
-    for (i <- 0 until numParticles) {
+    var initPositions = BufferUtils.createFloatBuffer(numParticlesWidth * numParticlesHeight * 4)
+    for (i <- 0 until numParticlesWidth * numParticlesHeight) {
       initPositions.put(randRange(0, screenWidth))
       initPositions.put(randRange(0, screenHeight))
       initPositions.put(0)
@@ -128,7 +132,7 @@ class GBuffer {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, numParticles, 1, 0, GL_RGBA, GL_FLOAT, initPositions)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, numParticlesWidth, numParticlesHeight, 0, GL_RGBA, GL_FLOAT, initPositions)
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_POSITIONS, GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_POSITIONS), 0)
 
     // albedo/diffuse (16-bit channel rgba)
@@ -137,7 +141,7 @@ class GBuffer {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, numParticles, 1, 0, GL_RGBA, GL_FLOAT, null:FloatBuffer)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, numParticlesWidth, numParticlesHeight, 0, GL_RGBA, GL_FLOAT, null:FloatBuffer)
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_VELOCITIES, GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_VELOCITIES), 0)
 
     // albedo/diffuse (16-bit channel rgba)
@@ -189,7 +193,7 @@ class GBuffer {
 
   def update(deltaTime:Double) {
     glBindFramebuffer(GL_FRAMEBUFFER, fbo)
-    glViewport(0, 0, numParticles, 1)
+    glViewport(0, 0, numParticlesWidth, numParticlesHeight)
 
     val buffer = BufferUtils.createIntBuffer(2)
     buffer.put(GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_POSITIONS)
@@ -215,7 +219,7 @@ class GBuffer {
 
     val program = ShaderProgram.getActiveShader()
 
-    var projection = Matrix4.ortho(0, numParticles, 1, 0, -1, 1)
+    var projection = Matrix4.ortho(0, numParticlesWidth, numParticlesHeight, 0, -1, 1)
     program.setUniformMatrix4("uProjectionMatrix", projection.getFloatBuffer)
 
     val aCoordLocation = glGetAttribLocation(program.id, "aCoord")
@@ -225,7 +229,7 @@ class GBuffer {
     glEnableVertexAttribArray(aTexCoordLocation)
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo)
-    glVertexAttribPointer(aCoordLocation, 3, GL_FLOAT, false, 4 * 4, 0)
+    glVertexAttribPointer(aCoordLocation, 2, GL_FLOAT, false, 4 * 4, 0)
 
     glVertexAttribPointer(aTexCoordLocation, 2, GL_FLOAT, false, 4 * 4, 2 * 4)
 
@@ -248,8 +252,10 @@ class GBuffer {
 
     glActiveTexture(GL_TEXTURE0)
     glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_POSITIONS))
+    glActiveTexture(GL_TEXTURE1)
+    glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_VELOCITIES))
     program.setUniform1i("uPositionSampler", 0)
-    program.setUniform1f("uNumParticles", numParticles.toFloat)
+    program.setUniform1i("uVelocitySampler", 1)
 
     val aCoordLocation = glGetAttribLocation(program.id, "aCoord")
 
@@ -258,7 +264,7 @@ class GBuffer {
     glBindBuffer(GL_ARRAY_BUFFER, drawVBO)
     glVertexAttribPointer(aCoordLocation, 2, GL_FLOAT, false, 4 * 4, 0)
 
-    glDrawArrays(GL_POINTS, 0, numParticles)
+    glDrawArrays(GL_POINTS, 0, numParticlesWidth * numParticlesHeight)
 
     glDisableVertexAttribArray(aCoordLocation)
 

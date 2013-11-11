@@ -40,7 +40,7 @@ class GS_Game extends GameState {
   var angle:Double = 0
 
   var gbuf = new GBuffer()
-  gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 5000)
+  gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 1000)
 
   def init() = {
     setupScreenVBO()
