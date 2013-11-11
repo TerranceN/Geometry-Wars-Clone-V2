@@ -116,8 +116,10 @@ class GBuffer {
 
     var initPositions = BufferUtils.createFloatBuffer(numParticlesWidth * numParticlesHeight * 4)
     for (i <- 0 until numParticlesWidth * numParticlesHeight) {
-      initPositions.put(randRange(0, screenWidth))
-      initPositions.put(randRange(0, screenHeight))
+      var x = randRange(0, screenWidth)
+      var y = randRange(0, screenHeight)
+      initPositions.put(x)
+      initPositions.put(y)
       initPositions.put(0)
       initPositions.put(1)
     }
@@ -202,9 +204,6 @@ class GBuffer {
 
     glDrawBuffers(buffer)
 
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
-    glClear(GL_COLOR_BUFFER_BIT)
-
     particleUpdateShader.bind()
     glActiveTexture(GL_TEXTURE0)
     glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_POSITIONS))
@@ -262,7 +261,7 @@ class GBuffer {
     glEnableVertexAttribArray(aCoordLocation)
 
     glBindBuffer(GL_ARRAY_BUFFER, drawVBO)
-    glVertexAttribPointer(aCoordLocation, 2, GL_FLOAT, false, 4 * 4, 0)
+    glVertexAttribPointer(aCoordLocation, 2, GL_FLOAT, false, 2 * 4, 0)
 
     glDrawArrays(GL_POINTS, 0, numParticlesWidth * numParticlesHeight)
 
