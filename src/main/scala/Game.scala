@@ -12,7 +12,7 @@ import scala.collection.mutable.Stack
 
 object Game extends App {
   Console.println(System.getProperty("java.library.path"))
-  val fpsCap = 500
+  val fpsCap = 180
   var gameStates = new Stack[GameState]
   var lastFrameTime:Long = 0
   gameStates.push(new GS_Init)

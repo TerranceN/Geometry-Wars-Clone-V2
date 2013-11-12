@@ -22,10 +22,10 @@ void main() {
     vec2 newVelocity = vec2(0);
     newOffset = oldOffset + oldVelocity * uDeltaTime;
     float offsetLength = length(newOffset);
-    if (length(acceleration) < 0.01 && offsetLength < 0.25 && offsetLength > 0) {
+    if (length(acceleration) < 0.01 && offsetLength < 1 && offsetLength > 0) {
         newOffset = vec2(0);
     } else {
-        newVelocity = oldVelocity + acceleration * uDeltaTime * 400000 - oldVelocity * uDeltaTime * 100 - diffToCenter * uDeltaTime * 1000;
+        newVelocity = oldVelocity + (acceleration * uDeltaTime * 8000 - diffToCenter * uDeltaTime * 20) * 10 - oldVelocity * uDeltaTime * 40;
     }
     gl_FragData[0] = vec4(newOffset, 0, 1);
     gl_FragData[1] = vec4(newVelocity, 0, 0);
