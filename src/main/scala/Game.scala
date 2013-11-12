@@ -13,7 +13,7 @@ import scala.collection.mutable.Stack
 object Game extends App {
   Console.println(System.getProperty("java.library.path"))
   val updateFPSCap = 500
-  val drawFPSCap = 80
+  val drawFPSCap = 500
   var gameStates = new Stack[GameState]
   gameStates.push(new GS_Init)
 

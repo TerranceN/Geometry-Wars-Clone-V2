@@ -23,8 +23,31 @@ import lighting._
 import matricies._
 
 class GS_Game extends GameState {
+  class Bullet(var position:Vector2, var velocity:Vector2) {
+    var timeAlive:Float = 0
+    var pushStrength:Float = 0
+    var isAlive = true
+    val timeToMax = 0.25f
+    def update(deltaTime:Double) {
+      if (timeAlive < timeToMax) {
+        pushStrength = timeAlive / timeToMax
+      } else {
+        pushStrength = 1
+      }
+      pushStrength = pushStrength * (velocity.length / 600)
+      timeAlive += deltaTime.toFloat
+      position += velocity * deltaTime.toFloat
+
+      if (position.x < 0 || position.y < 0 || position.x > GLFrustum.screenWidth || position.y > GLFrustum.screenHeight) {
+        isAlive = false
+      }
+    }
+  }
+
   val random = new Random
   val screenVBO = glGenBuffers()
+
+  var wasMouse0Down = false
 
   val accelerationShader = new ShaderProgram(
     new VertexShader("shaders/test.vert"),
@@ -36,8 +59,9 @@ class GS_Game extends GameState {
     new FragmentShader("shaders/mainScene.frag")
   )
 
-  var y:Double = 0
   var angle:Double = 0
+
+  var bulletList:List[Bullet] = Nil
 
   var gbuf = new GBuffer()
   gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 241, 141)
@@ -99,14 +123,46 @@ class GS_Game extends GameState {
   }
 
   def update(deltaTime:Double) = {
+    angle += 5 * deltaTime.toFloat
+
+    if (!wasMouse0Down && Mouse.isButtonDown(0)) {
+      var middle = new Vector2(GLFrustum.screenWidth, GLFrustum.screenHeight) * 0.5f
+      var mouse = new Vector2(Mouse.getX, Mouse.getY)
+      var diff = mouse - middle
+      var angle = atan2(diff.y, diff.x)
+      for (i <- -1 to 1) {
+        var newAngle = angle + Pi / 15 * i
+        bulletList = new Bullet(middle, new Vector2(cos(newAngle).toFloat, sin(newAngle).toFloat) * 500) :: bulletList
+      }
+    }
+
+    for (b <- bulletList) {
+      b.update(deltaTime)
+    }
+
     gbuf.accelerationPass()
       accelerationShader.bind()
-        accelerationShader.setUniform2f("uMousePosition", Mouse.getX.toFloat, Mouse.getY.toFloat)
+        accelerationShader.setUniform2f("uPushPositions[0]", Mouse.getX.toFloat, Mouse.getY.toFloat)
+        bulletList.zipWithIndex.foreach{ case (b, i) =>
+          accelerationShader.setUniform2f("uPushPositions[" + (i) + "]", b.position.x, b.position.y)
+          accelerationShader.setUniform1f("uPushStrength[" + (i) + "]", b.pushStrength)
+        }
+        accelerationShader.setUniform1i("uNumPositions", bulletList.size);
         drawScreenVBO()
       accelerationShader.unbind()
     gbuf.endAccelerationPass()
 
     gbuf.update(deltaTime)
+
+    var temp:List[Bullet] = List()
+    for (b <- bulletList) {
+      if (b.isAlive) {
+        temp = b :: temp
+      }
+    }
+    bulletList = temp
+
+    wasMouse0Down = Mouse.isButtonDown(0)
   }
 
   def checkError() {
