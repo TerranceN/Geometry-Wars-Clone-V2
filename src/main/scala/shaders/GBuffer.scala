@@ -19,9 +19,10 @@ import com.awesome.matricies._
 
 object TextureType extends Enumeration {
   val GBUFFER_TEXTURE_TYPE_POSITIONS = 0
-  val GBUFFER_TEXTURE_TYPE_VELOCITIES = 1
-  val GBUFFER_TEXTURE_TYPE_ACCELERATIONS = 2
-  val GBUFFER_NUM_TEXTURES = 3
+  val GBUFFER_TEXTURE_TYPE_OFFSETS = 1
+  val GBUFFER_TEXTURE_TYPE_VELOCITIES = 2
+  val GBUFFER_TEXTURE_TYPE_ACCELERATIONS = 3
+  val GBUFFER_NUM_TEXTURES = 4
 }
 
 class GBuffer {
@@ -33,7 +34,8 @@ class GBuffer {
   var numParticlesHeight = 50
 
   var vbo = glGenBuffers()
-  var drawVBO = glGenBuffers()
+  var drawHorizontalLinesVBO = glGenBuffers()
+  var drawVerticalLinesVBO = glGenBuffers()
 
   val random = new Random()
 
@@ -47,11 +49,11 @@ class GBuffer {
   var screenWidth = 0
   var screenHeight = 0
 
-  def setup(screenWidth:Int, screenHeight:Int, numParticles:Int) {
+  def setup(screenWidth:Int, screenHeight:Int, particlesWidth:Int, particlesHeight:Int) {
     this.screenWidth = screenWidth
     this.screenHeight = screenHeight
-    numParticlesWidth = numParticles
-    numParticlesHeight = numParticles
+    numParticlesWidth = particlesWidth
+    numParticlesHeight = particlesHeight
 
     if (!isSetup) {
       loadShaders()
@@ -64,15 +66,31 @@ class GBuffer {
   }
 
   def setupDrawVBO() {
-    val vertexBuffer = BufferUtils.createFloatBuffer(numParticlesWidth * numParticlesHeight * 2)
-    for (i <- 0 until numParticlesWidth) {
-      for (j <- 0 until numParticlesHeight) {
-        vertexBuffer.put(i); vertexBuffer.put(j)
+    def offset(i:Int, j:Int, max:Int) = (j % 2) match {
+      case 0 => i
+      case 1 => (max - i) - 1
+    }
+
+    var vertexBuffer = BufferUtils.createFloatBuffer(numParticlesWidth * numParticlesHeight * 2)
+    for (j <- 0 until numParticlesHeight) {
+      for (i <- 0 until numParticlesWidth) {
+        vertexBuffer.put(offset(i, j, numParticlesWidth)); vertexBuffer.put(j)
       }
     }
     vertexBuffer.flip()
 
-    glBindBuffer(GL_ARRAY_BUFFER, drawVBO)
+    glBindBuffer(GL_ARRAY_BUFFER, drawHorizontalLinesVBO)
+    glBufferData(GL_ARRAY_BUFFER, vertexBuffer, GL_STATIC_DRAW)
+
+    vertexBuffer = BufferUtils.createFloatBuffer(numParticlesWidth * numParticlesHeight * 2)
+    for (i <- 0 until numParticlesWidth) {
+      for (j <- 0 until numParticlesHeight) {
+        vertexBuffer.put(i); vertexBuffer.put(offset(j, i, numParticlesHeight))
+      }
+    }
+    vertexBuffer.flip()
+
+    glBindBuffer(GL_ARRAY_BUFFER, drawVerticalLinesVBO)
     glBufferData(GL_ARRAY_BUFFER, vertexBuffer, GL_STATIC_DRAW)
   }
 
@@ -115,13 +133,17 @@ class GBuffer {
     glBindFramebuffer(GL_FRAMEBUFFER, fbo)
 
     var initPositions = BufferUtils.createFloatBuffer(numParticlesWidth * numParticlesHeight * 4)
-    for (i <- 0 until numParticlesWidth * numParticlesHeight) {
-      var x = randRange(0, screenWidth)
-      var y = randRange(0, screenHeight)
-      initPositions.put(x)
-      initPositions.put(y)
-      initPositions.put(0)
-      initPositions.put(1)
+    var xSize = screenWidth.toFloat / (numParticlesWidth + 1)
+    var ySize = screenHeight.toFloat / (numParticlesHeight + 1)
+    for (j <- 0 until numParticlesHeight) {
+      for (i <- 0 until numParticlesWidth) {
+        var x = (i + 1) * xSize
+        var y = (j + 1) * ySize
+        initPositions.put(x)
+        initPositions.put(y)
+        initPositions.put(0)
+        initPositions.put(1)
+      }
     }
     initPositions.flip()
 
@@ -136,6 +158,15 @@ class GBuffer {
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, numParticlesWidth, numParticlesHeight, 0, GL_RGBA, GL_FLOAT, initPositions)
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_POSITIONS, GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_POSITIONS), 0)
+
+    // albedo/diffuse (16-bit channel rgba)
+    glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_OFFSETS))
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, numParticlesWidth, numParticlesHeight, 0, GL_RGBA, GL_FLOAT, null:FloatBuffer)
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_OFFSETS, GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_OFFSETS), 0)
 
     // albedo/diffuse (16-bit channel rgba)
     glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_VELOCITIES))
@@ -198,7 +229,7 @@ class GBuffer {
     glViewport(0, 0, numParticlesWidth, numParticlesHeight)
 
     val buffer = BufferUtils.createIntBuffer(2)
-    buffer.put(GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_POSITIONS)
+    buffer.put(GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_OFFSETS)
     buffer.put(GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_VELOCITIES)
     buffer.flip()
 
@@ -208,12 +239,15 @@ class GBuffer {
     glActiveTexture(GL_TEXTURE0)
     glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_POSITIONS))
     glActiveTexture(GL_TEXTURE1)
-    glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_VELOCITIES))
+    glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_OFFSETS))
     glActiveTexture(GL_TEXTURE2)
+    glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_VELOCITIES))
+    glActiveTexture(GL_TEXTURE3)
     glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_ACCELERATIONS))
     particleUpdateShader.setUniform1i("uPositionSampler", 0)
-    particleUpdateShader.setUniform1i("uVelocitySampler", 1)
-    particleUpdateShader.setUniform1i("uAccelerationSampler", 2)
+    particleUpdateShader.setUniform1i("uOffsetSampler", 1)
+    particleUpdateShader.setUniform1i("uVelocitySampler", 2)
+    particleUpdateShader.setUniform1i("uAccelerationSampler", 3)
     particleUpdateShader.setUniform1f("uDeltaTime", deltaTime.toFloat)
 
     val program = ShaderProgram.getActiveShader()
@@ -252,18 +286,24 @@ class GBuffer {
     glActiveTexture(GL_TEXTURE0)
     glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_POSITIONS))
     glActiveTexture(GL_TEXTURE1)
+    glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_OFFSETS))
+    glActiveTexture(GL_TEXTURE2)
     glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_VELOCITIES))
     program.setUniform1i("uPositionSampler", 0)
-    program.setUniform1i("uVelocitySampler", 1)
+    program.setUniform1i("uOffsetSampler", 1)
+    program.setUniform1i("uVelocitySampler", 2)
 
     val aCoordLocation = glGetAttribLocation(program.id, "aCoord")
 
     glEnableVertexAttribArray(aCoordLocation)
 
-    glBindBuffer(GL_ARRAY_BUFFER, drawVBO)
+    glBindBuffer(GL_ARRAY_BUFFER, drawHorizontalLinesVBO)
     glVertexAttribPointer(aCoordLocation, 2, GL_FLOAT, false, 2 * 4, 0)
+    glDrawArrays(GL_LINE_STRIP, 0, numParticlesWidth * numParticlesHeight)
 
-    glDrawArrays(GL_POINTS, 0, numParticlesWidth * numParticlesHeight)
+    glBindBuffer(GL_ARRAY_BUFFER, drawVerticalLinesVBO)
+    glVertexAttribPointer(aCoordLocation, 2, GL_FLOAT, false, 2 * 4, 0)
+    glDrawArrays(GL_LINE_STRIP, 0, numParticlesWidth * numParticlesHeight)
 
     glDisableVertexAttribArray(aCoordLocation)
 

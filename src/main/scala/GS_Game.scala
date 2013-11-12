@@ -40,9 +40,7 @@ class GS_Game extends GameState {
   var angle:Double = 0
 
   var gbuf = new GBuffer()
-  gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 1000)
-
-  var runUpdate = false
+  gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 241, 141)
 
   def init() = {
     setupScreenVBO()
@@ -101,10 +99,6 @@ class GS_Game extends GameState {
   }
 
   def update(deltaTime:Double) = {
-    if (Keyboard.isKeyDown(Keyboard.KEY_U)) {
-      runUpdate = true
-    }
-
     gbuf.accelerationPass()
       accelerationShader.bind()
         accelerationShader.setUniform2f("uMousePosition", Mouse.getX.toFloat, Mouse.getY.toFloat)
@@ -112,9 +106,7 @@ class GS_Game extends GameState {
       accelerationShader.unbind()
     gbuf.endAccelerationPass()
 
-    if (runUpdate) {
-      gbuf.update(deltaTime)
-    }
+    gbuf.update(deltaTime)
   }
 
   def checkError() {
