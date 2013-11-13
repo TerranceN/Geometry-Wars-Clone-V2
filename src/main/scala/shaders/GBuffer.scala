@@ -44,7 +44,7 @@ class GBuffer {
 
   var textures = BufferUtils.createIntBuffer(GBUFFER_NUM_TEXTURES)
   var fbo = 0
-  var renderBuffer = 0
+  var accelerationFBO = 0
 
   var screenWidth = 0
   var screenHeight = 0
@@ -60,9 +60,14 @@ class GBuffer {
       isSetup = true
     }
 
+    // remake all extures
+    glDeleteTextures(textures)
+    glGenTextures(textures)
+
     setupScreenVBO()
     setupDrawVBO()
     setupFBO()
+    setupAccelerationFBO()
   }
 
   def setupDrawVBO() {
@@ -124,8 +129,6 @@ class GBuffer {
 
   def setupFBO():Boolean = {
     // delete objects in case screen size changed
-    glDeleteTextures(textures)
-    glDeleteRenderbuffers(renderBuffer)
     glDeleteFramebuffers(fbo)
 
     // create an fbo
@@ -147,8 +150,11 @@ class GBuffer {
     }
     initPositions.flip()
 
-    // create all gbuffer textures
-    glGenTextures(textures)
+    var blankBuffer = BufferUtils.createFloatBuffer(numParticlesWidth * numParticlesHeight * 4)
+    for (i <- 0 until numParticlesWidth * numParticlesHeight * 4) {
+      blankBuffer.put(0)
+    }
+    blankBuffer.flip()
 
     // albedo/diffuse (16-bit channel rgba)
     glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_POSITIONS))
@@ -165,7 +171,7 @@ class GBuffer {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, numParticlesWidth, numParticlesHeight, 0, GL_RGBA, GL_FLOAT, null:FloatBuffer)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, numParticlesWidth, numParticlesHeight, 0, GL_RGBA, GL_FLOAT, blankBuffer)
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_OFFSETS, GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_OFFSETS), 0)
 
     // albedo/diffuse (16-bit channel rgba)
@@ -174,8 +180,31 @@ class GBuffer {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, numParticlesWidth, numParticlesHeight, 0, GL_RGBA, GL_FLOAT, null:FloatBuffer)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, numParticlesWidth, numParticlesHeight, 0, GL_RGBA, GL_FLOAT, blankBuffer)
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_VELOCITIES, GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_VELOCITIES), 0)
+
+    // check status
+    val status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0)
+    glBindRenderbuffer(GL_RENDERBUFFER, 0)
+    glBindTexture(GL_TEXTURE_2D, 0)
+
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+      Console.println("GBuffer::setupFbo()" + "Could not create framebuffer")
+      return false
+    }
+
+    return true
+  }
+
+  def setupAccelerationFBO():Boolean = {
+    // delete objects in case screen size changed
+    glDeleteFramebuffers(accelerationFBO)
+
+    // create an fbo
+    accelerationFBO = glGenFramebuffers()
+    glBindFramebuffer(GL_FRAMEBUFFER, accelerationFBO)
 
     // albedo/diffuse (16-bit channel rgba)
     glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_ACCELERATIONS))
@@ -194,7 +223,7 @@ class GBuffer {
     glBindTexture(GL_TEXTURE_2D, 0)
 
     if (status != GL_FRAMEBUFFER_COMPLETE) {
-      Console.println("GBuffer::setupFbo()" + "Could not create framebuffer")
+      Console.println("GBuffer::setupAccelerationFBO()" + "Could not create framebuffer")
       return false
     }
 
@@ -206,7 +235,7 @@ class GBuffer {
   }
 
   def accelerationPass() {
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo)
+    glBindFramebuffer(GL_FRAMEBUFFER, accelerationFBO)
     glViewport(0, 0, screenWidth, screenHeight)
 
     val buffer = BufferUtils.createIntBuffer(1)
