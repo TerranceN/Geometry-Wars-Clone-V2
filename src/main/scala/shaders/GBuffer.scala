@@ -17,17 +17,7 @@ import com.awesome.GLFrustum
 import com.awesome.vectors._
 import com.awesome.matricies._
 
-object TextureType extends Enumeration {
-  val GBUFFER_TEXTURE_TYPE_POSITIONS = 0
-  val GBUFFER_TEXTURE_TYPE_OFFSETS = 1
-  val GBUFFER_TEXTURE_TYPE_VELOCITIES = 2
-  val GBUFFER_TEXTURE_TYPE_ACCELERATIONS = 3
-  val GBUFFER_NUM_TEXTURES = 4
-}
-
 class GBuffer {
-  import TextureType._
-
   var isSetup = false
 
   var numParticlesWidth = 50
@@ -42,9 +32,8 @@ class GBuffer {
   var particleUpdateShader:ShaderProgram = null
   var particleDrawShader:ShaderProgram = null
 
-  var textures = BufferUtils.createIntBuffer(GBUFFER_NUM_TEXTURES)
-  var fbo = 0
-  var accelerationFBO = 0
+  var fbo:Framebuffer = null
+  var accelerationFBO:Framebuffer = null
 
   var screenWidth = 0
   var screenHeight = 0
@@ -59,10 +48,6 @@ class GBuffer {
       loadShaders()
       isSetup = true
     }
-
-    // remake all extures
-    glDeleteTextures(textures)
-    glGenTextures(textures)
 
     setupScreenVBO()
     setupDrawVBO()
@@ -128,12 +113,11 @@ class GBuffer {
   }
 
   def setupFBO():Boolean = {
-    // delete objects in case screen size changed
-    glDeleteFramebuffers(fbo)
+    if (fbo != null) {
+      fbo.delete
+    }
 
-    // create an fbo
-    fbo = glGenFramebuffers()
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo)
+    fbo = new Framebuffer(numParticlesWidth, numParticlesHeight)
 
     var initPositions = BufferUtils.createFloatBuffer(numParticlesWidth * numParticlesHeight * 4)
     var xSize = screenWidth.toFloat / (numParticlesWidth + 1)
@@ -150,38 +134,9 @@ class GBuffer {
     }
     initPositions.flip()
 
-    var blankBuffer = BufferUtils.createFloatBuffer(numParticlesWidth * numParticlesHeight * 4)
-    for (i <- 0 until numParticlesWidth * numParticlesHeight * 4) {
-      blankBuffer.put(0)
-    }
-    blankBuffer.flip()
-
-    // albedo/diffuse (16-bit channel rgba)
-    glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_POSITIONS))
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, numParticlesWidth, numParticlesHeight, 0, GL_RGBA, GL_FLOAT, initPositions)
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_POSITIONS, GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_POSITIONS), 0)
-
-    // albedo/diffuse (16-bit channel rgba)
-    glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_OFFSETS))
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, numParticlesWidth, numParticlesHeight, 0, GL_RGBA, GL_FLOAT, blankBuffer)
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_OFFSETS, GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_OFFSETS), 0)
-
-    // albedo/diffuse (16-bit channel rgba)
-    glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_VELOCITIES))
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, numParticlesWidth, numParticlesHeight, 0, GL_RGBA, GL_FLOAT, blankBuffer)
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_VELOCITIES, GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_VELOCITIES), 0)
+    fbo.newTexture("positions", GL_RGBA32F, initPositions)
+    fbo.newTexture("offsets", GL_RGBA32F, null)
+    fbo.newTexture("velocities", GL_RGBA32F, null)
 
     // check status
     val status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
@@ -199,21 +154,12 @@ class GBuffer {
   }
 
   def setupAccelerationFBO():Boolean = {
-    // delete objects in case screen size changed
-    glDeleteFramebuffers(accelerationFBO)
+    if (accelerationFBO != null) {
+      accelerationFBO.delete
+    }
 
-    // create an fbo
-    accelerationFBO = glGenFramebuffers()
-    glBindFramebuffer(GL_FRAMEBUFFER, accelerationFBO)
-
-    // albedo/diffuse (16-bit channel rgba)
-    glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_ACCELERATIONS))
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, screenWidth, screenHeight, 0, GL_RGBA, GL_FLOAT, null:FloatBuffer)
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_ACCELERATIONS, GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_ACCELERATIONS), 0)
+    accelerationFBO = new Framebuffer(screenWidth, screenHeight)
+    accelerationFBO.newTexture("accelerations", GL_RGBA32F, null)
 
     // check status
     val status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
@@ -230,79 +176,55 @@ class GBuffer {
     return true
   }
 
-  def getTexture(texType:Int):Int = {
-    return textures.get(texType);
-  }
+  def accelerationPass(f: => Unit) {
+    accelerationFBO.drawToTextures(List("accelerations")) {
+      glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
+      glClear(GL_COLOR_BUFFER_BIT)
 
-  def accelerationPass() {
-    glBindFramebuffer(GL_FRAMEBUFFER, accelerationFBO)
-    glViewport(0, 0, screenWidth, screenHeight)
-
-    val buffer = BufferUtils.createIntBuffer(1)
-    buffer.put(GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_ACCELERATIONS)
-    buffer.flip()
-
-    glDrawBuffers(buffer)
-
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
-    glClear(GL_COLOR_BUFFER_BIT)
-  }
-
-  def endAccelerationPass() {
-    glBindFramebuffer(GL_FRAMEBUFFER, 0)
-    glDrawBuffer(GL_BACK)
+      f
+    }
   }
 
   def update(deltaTime:Double) {
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo)
-    glViewport(0, 0, numParticlesWidth, numParticlesHeight)
+    fbo.drawToTextures(List("offsets", "velocities")) {
+      particleUpdateShader.bind()
+      glActiveTexture(GL_TEXTURE0)
+      glBindTexture(GL_TEXTURE_2D, fbo.getTexture("positions"))
+      glActiveTexture(GL_TEXTURE1)
+      glBindTexture(GL_TEXTURE_2D, fbo.getTexture("offsets"))
+      glActiveTexture(GL_TEXTURE2)
+      glBindTexture(GL_TEXTURE_2D, fbo.getTexture("velocities"))
+      glActiveTexture(GL_TEXTURE3)
+      glBindTexture(GL_TEXTURE_2D, accelerationFBO.getTexture("accelerations"))
+      particleUpdateShader.setUniform1i("uPositionSampler", 0)
+      particleUpdateShader.setUniform1i("uOffsetSampler", 1)
+      particleUpdateShader.setUniform1i("uVelocitySampler", 2)
+      particleUpdateShader.setUniform1i("uAccelerationSampler", 3)
+      particleUpdateShader.setUniform1f("uDeltaTime", deltaTime.toFloat)
 
-    val buffer = BufferUtils.createIntBuffer(2)
-    buffer.put(GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_OFFSETS)
-    buffer.put(GL_COLOR_ATTACHMENT0 + GBUFFER_TEXTURE_TYPE_VELOCITIES)
-    buffer.flip()
+      val program = ShaderProgram.getActiveShader()
 
-    glDrawBuffers(buffer)
+      var projection = Matrix4.ortho(0, numParticlesWidth, numParticlesHeight, 0, -1, 1)
+      program.setUniformMatrix4("uProjectionMatrix", projection.getFloatBuffer)
 
-    particleUpdateShader.bind()
-    glActiveTexture(GL_TEXTURE0)
-    glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_POSITIONS))
-    glActiveTexture(GL_TEXTURE1)
-    glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_OFFSETS))
-    glActiveTexture(GL_TEXTURE2)
-    glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_VELOCITIES))
-    glActiveTexture(GL_TEXTURE3)
-    glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_ACCELERATIONS))
-    particleUpdateShader.setUniform1i("uPositionSampler", 0)
-    particleUpdateShader.setUniform1i("uOffsetSampler", 1)
-    particleUpdateShader.setUniform1i("uVelocitySampler", 2)
-    particleUpdateShader.setUniform1i("uAccelerationSampler", 3)
-    particleUpdateShader.setUniform1f("uDeltaTime", deltaTime.toFloat)
+      val aCoordLocation = glGetAttribLocation(program.id, "aCoord")
+      val aTexCoordLocation = glGetAttribLocation(program.id, "aTexCoord")
 
-    val program = ShaderProgram.getActiveShader()
+      glEnableVertexAttribArray(aCoordLocation)
+      glEnableVertexAttribArray(aTexCoordLocation)
 
-    var projection = Matrix4.ortho(0, numParticlesWidth, numParticlesHeight, 0, -1, 1)
-    program.setUniformMatrix4("uProjectionMatrix", projection.getFloatBuffer)
+      glBindBuffer(GL_ARRAY_BUFFER, vbo)
+      glVertexAttribPointer(aCoordLocation, 2, GL_FLOAT, false, 4 * 4, 0)
 
-    val aCoordLocation = glGetAttribLocation(program.id, "aCoord")
-    val aTexCoordLocation = glGetAttribLocation(program.id, "aTexCoord")
+      glVertexAttribPointer(aTexCoordLocation, 2, GL_FLOAT, false, 4 * 4, 2 * 4)
 
-    glEnableVertexAttribArray(aCoordLocation)
-    glEnableVertexAttribArray(aTexCoordLocation)
+      glDrawArrays(GL_QUADS, 0, 4)
 
-    glBindBuffer(GL_ARRAY_BUFFER, vbo)
-    glVertexAttribPointer(aCoordLocation, 2, GL_FLOAT, false, 4 * 4, 0)
+      glDisableVertexAttribArray(aCoordLocation)
+      glDisableVertexAttribArray(aTexCoordLocation)
 
-    glVertexAttribPointer(aTexCoordLocation, 2, GL_FLOAT, false, 4 * 4, 2 * 4)
-
-    glDrawArrays(GL_QUADS, 0, 4)
-
-    glDisableVertexAttribArray(aCoordLocation)
-    glDisableVertexAttribArray(aTexCoordLocation)
-
-    particleUpdateShader.unbind()
-    glBindFramebuffer(GL_FRAMEBUFFER, 0)
-    glDrawBuffer(GL_BACK)
+      particleUpdateShader.unbind()
+    }
   }
 
   def draw() {
@@ -313,11 +235,11 @@ class GBuffer {
     GLFrustum.setMatricies()
 
     glActiveTexture(GL_TEXTURE0)
-    glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_POSITIONS))
+    glBindTexture(GL_TEXTURE_2D, fbo.getTexture("positions"))
     glActiveTexture(GL_TEXTURE1)
-    glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_OFFSETS))
+    glBindTexture(GL_TEXTURE_2D, fbo.getTexture("offsets"))
     glActiveTexture(GL_TEXTURE2)
-    glBindTexture(GL_TEXTURE_2D, textures.get(GBUFFER_TEXTURE_TYPE_VELOCITIES))
+    glBindTexture(GL_TEXTURE_2D, fbo.getTexture("velocities"))
     program.setUniform1i("uPositionSampler", 0)
     program.setUniform1i("uOffsetSampler", 1)
     program.setUniform1i("uVelocitySampler", 2)

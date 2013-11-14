@@ -18,9 +18,9 @@ void main() {
 
     vec4 final_color = vec4(0, 0, 0.5, 1);
 
-    if (index % 10 == 0) {
-        final_color = vec4(0, 0, 1, 1);
-    }
+    //if (index % 10 == 0) {
+    //    final_color = vec4(0, 0, 1, 1);
+    //}
 
     gl_FragColor = final_color;// * clamp(length(texture2D(uVelocitySampler, texCoord).xy), 0.5, 1);
 }

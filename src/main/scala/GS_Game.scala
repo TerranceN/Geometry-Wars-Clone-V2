@@ -140,7 +140,7 @@ class GS_Game extends GameState {
       b.update(deltaTime)
     }
 
-    gbuf.accelerationPass()
+    gbuf.accelerationPass {
       accelerationShader.bind()
         accelerationShader.setUniform2f("uPushPositions[0]", Mouse.getX.toFloat, Mouse.getY.toFloat)
         bulletList.zipWithIndex.foreach{ case (b, i) =>
@@ -150,7 +150,7 @@ class GS_Game extends GameState {
         accelerationShader.setUniform1i("uNumPositions", bulletList.size);
         drawScreenVBO()
       accelerationShader.unbind()
-    gbuf.endAccelerationPass()
+    }
 
     gbuf.update(deltaTime)
 

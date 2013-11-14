@@ -22,59 +22,65 @@ object Game extends App {
 
   class GameRunner extends Thread {
     override def run() = {
-      gameStates.synchronized {
-        // the first thread will make an opengl context, so it needs to be initialized here
-        gameStates.head.init
-      }
-      var exit = false
-      var lastFrameTime:Long = 0
-      var fpsCountStart:Long = System.nanoTime
-      var fpsFrameCount:Int = 0
-      while (!exit) {
-        var startTime:Long = 0
+      try {
         gameStates.synchronized {
-          threadsExit = Display.isCloseRequested && !gameStates.isEmpty
-          exit = threadsExit
-
-          startTime = System.nanoTime
-          val currentState = gameStates.head
-          // update the current state
-          currentState.update(lastFrameTime / 1000000000d)
-
-          // if that update caused the state to die, remove to from the stack
-          // otherwise, draw the state
-          if (!currentState.isAlive) {
-            gameStates.pop
-          }
-
-          // since updating includes opengl calls and runs much faster, draw is run from here
-          if (shouldDraw) {
-            currentState.draw
-            Display.update
-            shouldDraw = false
-          }
-
-          // check if there is a next state
-          if (currentState.hasNextState) {
-            gameStates.push(currentState.takeNextState)
-            gameStates.head.init
-          }
-        } // nothing else depends on shared data, so exit the synchronized section
-
-        // calculate the time taken and delay the game if enabled
-        val endTime = System.nanoTime
-        val delayTime = (1000d / updateFPSCap.toDouble) - ((endTime - startTime) / 1000000)
-        if (delayTime > 0) Thread.sleep(delayTime.toInt)
-        fpsFrameCount += 1
-        val fpsTimeDiff = System.nanoTime - fpsCountStart
-        if (fpsTimeDiff >= 1000000000) {
-          Console.println("fps: " + (1000000000d / (fpsTimeDiff / fpsFrameCount)))
-          fpsFrameCount = 0
-          fpsCountStart = System.nanoTime
+          // the first thread will make an opengl context, so it needs to be initialized here
+          gameStates.head.init
         }
-        lastFrameTime = System.nanoTime - startTime
+        var exit = false
+        var lastFrameTime:Long = 0
+        var fpsCountStart:Long = System.nanoTime
+        var fpsFrameCount:Int = 0
+        while (!exit) {
+          var startTime:Long = 0
+          gameStates.synchronized {
+            threadsExit = Display.isCloseRequested && !gameStates.isEmpty
+            exit = threadsExit
+
+            startTime = System.nanoTime
+            val currentState = gameStates.head
+            // update the current state
+            currentState.update(lastFrameTime / 1000000000d)
+
+            // if that update caused the state to die, remove to from the stack
+            // otherwise, draw the state
+            if (!currentState.isAlive) {
+              gameStates.pop
+            }
+
+            // since updating includes opengl calls and runs much faster, draw is run from here
+            if (shouldDraw) {
+              currentState.draw
+              Display.update
+              shouldDraw = false
+            }
+
+            // check if there is a next state
+            if (currentState.hasNextState) {
+              gameStates.push(currentState.takeNextState)
+              gameStates.head.init
+            }
+          } // nothing else depends on shared data, so exit the synchronized section
+
+          // calculate the time taken and delay the game if enabled
+          val endTime = System.nanoTime
+          val delayTime = (1000d / updateFPSCap.toDouble) - ((endTime - startTime) / 1000000)
+          if (delayTime > 0) Thread.sleep(delayTime.toInt)
+          fpsFrameCount += 1
+          val fpsTimeDiff = System.nanoTime - fpsCountStart
+          if (fpsTimeDiff >= 1000000000) {
+            Console.println("fps: " + (1000000000d / (fpsTimeDiff / fpsFrameCount)))
+            fpsFrameCount = 0
+            fpsCountStart = System.nanoTime
+          }
+          lastFrameTime = System.nanoTime - startTime
+        }
+      } finally {
+        gameStates.synchronized {
+          threadsExit = true
+        }
+        Display.destroy()
       }
-      Display.destroy()
     }
   }
 
