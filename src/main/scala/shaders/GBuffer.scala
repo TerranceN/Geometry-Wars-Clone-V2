@@ -64,7 +64,7 @@ class GBuffer {
     var vertexBuffer = BufferUtils.createFloatBuffer(numParticlesWidth * numParticlesHeight * 2)
     for (j <- 0 until numParticlesHeight) {
       for (i <- 0 until numParticlesWidth) {
-        vertexBuffer.put(offset(i, j, numParticlesWidth)); vertexBuffer.put(j)
+        vertexBuffer.put(offset(i, j, numParticlesWidth) + 0.001f); vertexBuffer.put(j + 0.001f)
       }
     }
     vertexBuffer.flip()
@@ -75,7 +75,7 @@ class GBuffer {
     vertexBuffer = BufferUtils.createFloatBuffer(numParticlesWidth * numParticlesHeight * 2)
     for (i <- 0 until numParticlesWidth) {
       for (j <- 0 until numParticlesHeight) {
-        vertexBuffer.put(i); vertexBuffer.put(offset(j, i, numParticlesHeight))
+        vertexBuffer.put(i + 0.001f); vertexBuffer.put(offset(j, i, numParticlesHeight) + 0.001f)
       }
     }
     vertexBuffer.flip()
@@ -120,12 +120,12 @@ class GBuffer {
     fbo = new Framebuffer(numParticlesWidth, numParticlesHeight)
 
     var initPositions = BufferUtils.createFloatBuffer(numParticlesWidth * numParticlesHeight * 4)
-    var xSize = screenWidth.toFloat / (numParticlesWidth + 1)
-    var ySize = screenHeight.toFloat / (numParticlesHeight + 1)
+    var xSize:Double = screenWidth.toFloat / (numParticlesWidth + 1)
+    var ySize:Double = screenHeight.toFloat / (numParticlesHeight + 1)
     for (j <- 0 until numParticlesHeight) {
       for (i <- 0 until numParticlesWidth) {
-        var x = (i + 1) * xSize
-        var y = (j + 1) * ySize
+        var x:Float = ((i + 1) * xSize).toFloat
+        var y:Float = ((j + 1) * ySize).toFloat
         initPositions.put(x)
         initPositions.put(y)
         initPositions.put(0)
@@ -142,7 +142,6 @@ class GBuffer {
     val status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0)
-    glBindRenderbuffer(GL_RENDERBUFFER, 0)
     glBindTexture(GL_TEXTURE_2D, 0)
 
     if (status != GL_FRAMEBUFFER_COMPLETE) {
@@ -165,7 +164,6 @@ class GBuffer {
     val status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0)
-    glBindRenderbuffer(GL_RENDERBUFFER, 0)
     glBindTexture(GL_TEXTURE_2D, 0)
 
     if (status != GL_FRAMEBUFFER_COMPLETE) {

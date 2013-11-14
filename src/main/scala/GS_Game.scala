@@ -5,6 +5,7 @@ import org.lwjgl.opengl.GL12._
 import org.lwjgl.opengl.GL13._
 import org.lwjgl.opengl.GL15._
 import org.lwjgl.opengl.GL20._
+import org.lwjgl.opengl.GL30._
 import org.lwjgl.opengl.{
   Display,
   DisplayMode
@@ -47,7 +48,12 @@ class GS_Game extends GameState {
   val random = new Random
   val screenVBO = glGenBuffers()
 
+  var bloomFBO:Framebuffer = null
+
   var wasMouse0Down = false
+  var wasKeyBDown = false
+
+  var bloomEnabled = true
 
   val accelerationShader = new ShaderProgram(
     new VertexShader("shaders/test.vert"),
@@ -59,15 +65,30 @@ class GS_Game extends GameState {
     new FragmentShader("shaders/mainScene.frag")
   )
 
+  val blurShader = new ShaderProgram(
+    new VertexShader("shaders/blur.vert"),
+    new FragmentShader("shaders/blur.frag")
+  )
+
+  val additiveShader = new ShaderProgram(
+    new VertexShader("shaders/mainScene.vert"),
+    new FragmentShader("shaders/additive.frag")
+  )
+
   var angle:Double = 0
 
   var bulletList:List[Bullet] = Nil
 
   var gbuf = new GBuffer()
   gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 241, 141)
+  //gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 120, 60)
 
   def init() = {
     setupScreenVBO()
+    bloomFBO = new Framebuffer(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt)
+    bloomFBO.newTexture("bloom", GL_RGBA32F, null)
+    bloomFBO.newTexture("scene", GL_RGBA32F, null)
+    bloomFBO.newTexture("bloom_halfblur", GL_RGBA16F, null)
   }
 
   def setupScreenVBO() {
@@ -125,13 +146,18 @@ class GS_Game extends GameState {
   def update(deltaTime:Double) = {
     angle += 5 * deltaTime.toFloat
 
+
+    if (!wasKeyBDown && Keyboard.isKeyDown(Keyboard.KEY_B)) {
+      bloomEnabled = !bloomEnabled
+    }
+
     if (!wasMouse0Down && Mouse.isButtonDown(0)) {
       var middle = new Vector2(GLFrustum.screenWidth, GLFrustum.screenHeight) * 0.5f
       var mouse = new Vector2(Mouse.getX, Mouse.getY)
       var diff = mouse - middle
       var angle = atan2(diff.y, diff.x)
       for (i <- -1 to 1) {
-        var newAngle = angle + Pi / 15 * i
+        var newAngle = angle + Pi / 20 * i
         bulletList = new Bullet(middle, new Vector2(cos(newAngle).toFloat, sin(newAngle).toFloat) * 500) :: bulletList
       }
     }
@@ -145,6 +171,7 @@ class GS_Game extends GameState {
         accelerationShader.setUniform2f("uPushPositions[0]", Mouse.getX.toFloat, Mouse.getY.toFloat)
         bulletList.zipWithIndex.foreach{ case (b, i) =>
           accelerationShader.setUniform2f("uPushPositions[" + (i) + "]", b.position.x, b.position.y)
+          accelerationShader.setUniform2f("uPushVelocity[" + (i) + "]", b.velocity.x, b.velocity.y)
           accelerationShader.setUniform1f("uPushStrength[" + (i) + "]", b.pushStrength)
         }
         accelerationShader.setUniform1i("uNumPositions", bulletList.size);
@@ -163,6 +190,7 @@ class GS_Game extends GameState {
     bulletList = temp
 
     wasMouse0Down = Mouse.isButtonDown(0)
+    wasKeyBDown = Keyboard.isKeyDown(Keyboard.KEY_B)
   }
 
   def checkError() {
@@ -185,17 +213,51 @@ class GS_Game extends GameState {
     glViewport(0, 0, GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt)
     GLFrustum.modelviewMatrix.setIdentity()
     glClear(GL_COLOR_BUFFER_BIT)
-    glClear(GL_DEPTH_BUFFER_BIT)
 
+    bloomFBO.drawToTextures(List("scene")) {
+      glClear(GL_COLOR_BUFFER_BIT)
+      gbuf.draw()
+    }
 
-    gbuf.draw()
+    if (bloomEnabled) {
+      blurShader.bind()
+        blurShader.setUniform1f("uBlurSize", 1.0f);
+        bloomFBO.drawToTextures(List("bloom_halfblur")) {
+          blurShader.setUniform1f("horizontal", 1.0f);
+          glActiveTexture(GL_TEXTURE0)
+          glBindTexture(GL_TEXTURE_2D, bloomFBO.getTexture("scene"))
+          mainSceneShader.setUniform1i("uSampler", 0)
+          drawScreenVBO()
+        }
 
-    //mainSceneShader.bind()
-    //  glActiveTexture(GL_TEXTURE0)
-    //  glBindTexture(GL_TEXTURE_2D, gbuf.getTexture(TextureType.GBUFFER_TEXTURE_TYPE_ACCELERATIONS))
-    //  mainSceneShader.setUniform1i("uSampler", 0)
-    //  drawScreenVBO()
-    //mainSceneShader.unbind()
+        bloomFBO.drawToTextures(List("bloom")) {
+          blurShader.setUniform1f("horizontal", 0.0f);
+          glActiveTexture(GL_TEXTURE0)
+          glBindTexture(GL_TEXTURE_2D, bloomFBO.getTexture("bloom_halfblur"))
+          mainSceneShader.setUniform1i("uSampler", 0)
+          drawScreenVBO()
+        }
+      blurShader.unbind()
+
+      bloomFBO.drawToTextures(List("scene")) {
+        additiveShader.bind()
+          glActiveTexture(GL_TEXTURE0)
+          glBindTexture(GL_TEXTURE_2D, bloomFBO.getTexture("bloom"))
+          glActiveTexture(GL_TEXTURE1)
+          glBindTexture(GL_TEXTURE_2D, bloomFBO.getTexture("scene"))
+          additiveShader.setUniform1i("uSampler", 0)
+          additiveShader.setUniform1i("uExistingSampler", 1)
+          drawScreenVBO()
+        additiveShader.unbind()
+      }
+    }
+
+    mainSceneShader.bind()
+      glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, bloomFBO.getTexture("scene"))
+      mainSceneShader.setUniform1i("uSampler", 0)
+      drawScreenVBO()
+    mainSceneShader.unbind()
 
     //checkError
   }

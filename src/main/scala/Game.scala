@@ -75,6 +75,10 @@ object Game extends App {
           }
           lastFrameTime = System.nanoTime - startTime
         }
+      } catch {
+        case e:Exception => {
+          e.printStackTrace()
+        }
       } finally {
         gameStates.synchronized {
           threadsExit = true
