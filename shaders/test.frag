@@ -5,18 +5,18 @@ const int MAX_POSITIONS = 50;
 in vec2 texCoord;
 in vec2 fragCoord;
 
-uniform mat4 uProjectionMatrix;
 uniform vec2 uPushPositions[MAX_POSITIONS];
+uniform float uPushSize[MAX_POSITIONS];
 uniform float uPushStrength[MAX_POSITIONS];
 uniform vec2 uPushVelocity[MAX_POSITIONS];
 uniform int uNumPositions;
 
 void main() {
-    float size = 25;
     vec2 final_color = vec2(0);
 
     int positionsToDraw = min(uNumPositions, MAX_POSITIONS);
     for (int i = 0; i < positionsToDraw; i++) {
+        float size = uPushSize[i];
         vec2 diff = (fragCoord - uPushPositions[i]);
         float scale = dot(-normalize(diff), normalize(uPushVelocity[i]));
         if (scale > 0) {

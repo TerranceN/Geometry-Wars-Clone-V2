@@ -17,11 +17,11 @@ void main() {
         index = int(floor(vertexIndex.y));
     }
 
-    vec4 final_color = vec4(0.001, 0.001, 0.75, 1);
+    vec4 final_color = vec4(0.005, 0.005, 0.75, 1);
 
-    if (index % 10 == 0) {
-        final_color = vec4(0.05, 0.05, 1, 1);
+    if (index % 5 == 0) {
+        final_color = vec4(vec2(0.03), 1, 1);
     }
 
-    gl_FragColor = final_color;// * clamp(length(texture2D(uVelocitySampler, texCoord).xy), 0.5, 1);
+    gl_FragColor = final_color * 0.5;// * clamp(length(texture2D(uVelocitySampler, texCoord).xy), 0.5, 1);
 }

@@ -7,8 +7,6 @@ uniform float horizontal;
 uniform float uBlurSize;
 
 void main() {
-    float gamma = 1.0 / 2.2;
-
     /* 1: 1
      * 2: 1 1
      * 3: 1 2 1

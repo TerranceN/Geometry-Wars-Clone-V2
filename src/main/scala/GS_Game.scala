@@ -80,8 +80,8 @@ class GS_Game extends GameState {
   var bulletList:List[Bullet] = Nil
 
   var gbuf = new GBuffer()
-  gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 241, 141)
-  //gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 120, 60)
+  //gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 241, 141)
+  gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 121, 71)
 
   def init() = {
     setupScreenVBO()
@@ -127,17 +127,22 @@ class GS_Game extends GameState {
     val aTexCoordLocation = glGetAttribLocation(program.id, "aTexCoord")
 
     glEnableVertexAttribArray(aCoordLocation)
-    glEnableVertexAttribArray(aTexCoordLocation)
+    if (aTexCoordLocation >= 0) {
+      glEnableVertexAttribArray(aTexCoordLocation)
+    }
 
     glBindBuffer(GL_ARRAY_BUFFER, screenVBO)
     glVertexAttribPointer(aCoordLocation, 3, GL_FLOAT, false, 4 * 4, 0)
-
-    glVertexAttribPointer(aTexCoordLocation, 2, GL_FLOAT, false, 4 * 4, 2 * 4)
+    if (aTexCoordLocation >= 0) {
+      glVertexAttribPointer(aTexCoordLocation, 2, GL_FLOAT, false, 4 * 4, 2 * 4)
+    }
 
     glDrawArrays(GL_QUADS, 0, 4)
 
     glDisableVertexAttribArray(aCoordLocation)
-    glDisableVertexAttribArray(aTexCoordLocation)
+    if (aTexCoordLocation >= 0) {
+      glDisableVertexAttribArray(aTexCoordLocation)
+    }
 
     GLFrustum.popModelview()
     GLFrustum.popProjection()
@@ -158,7 +163,7 @@ class GS_Game extends GameState {
       var angle = atan2(diff.y, diff.x)
       for (i <- -1 to 1) {
         var newAngle = angle + Pi / 20 * i
-        bulletList = new Bullet(middle, new Vector2(cos(newAngle).toFloat, sin(newAngle).toFloat) * 500) :: bulletList
+        bulletList = new Bullet(middle, new Vector2(cos(newAngle).toFloat, sin(newAngle).toFloat) * 700) :: bulletList
       }
     }
 
@@ -169,12 +174,16 @@ class GS_Game extends GameState {
     gbuf.accelerationPass {
       accelerationShader.bind()
         accelerationShader.setUniform2f("uPushPositions[0]", Mouse.getX.toFloat, Mouse.getY.toFloat)
-        bulletList.zipWithIndex.foreach{ case (b, i) =>
-          accelerationShader.setUniform2f("uPushPositions[" + (i) + "]", b.position.x, b.position.y)
-          accelerationShader.setUniform2f("uPushVelocity[" + (i) + "]", b.velocity.x, b.velocity.y)
-          accelerationShader.setUniform1f("uPushStrength[" + (i) + "]", b.pushStrength)
-        }
-        accelerationShader.setUniform1i("uNumPositions", bulletList.size);
+        accelerationShader.setUniform2f("uPushVelocity[0]", 0, 0)
+        accelerationShader.setUniform1f("uPushStrength[0]", -0.5f)
+        accelerationShader.setUniform1f("uPushSize[0]", 250f)
+        accelerationShader.setUniform1i("uNumPositions", 1);
+        //bulletList.zipWithIndex.foreach{ case (b, i) =>
+        //  accelerationShader.setUniform2f("uPushPositions[" + (i) + "]", b.position.x, b.position.y)
+        //  accelerationShader.setUniform2f("uPushVelocity[" + (i) + "]", b.velocity.x, b.velocity.y)
+        //  accelerationShader.setUniform1f("uPushStrength[" + (i) + "]", b.pushStrength)
+        //}
+        //accelerationShader.setUniform1i("uNumPositions", bulletList.size);
         drawScreenVBO()
       accelerationShader.unbind()
     }
@@ -226,7 +235,7 @@ class GS_Game extends GameState {
           blurShader.setUniform1f("horizontal", 1.0f);
           glActiveTexture(GL_TEXTURE0)
           glBindTexture(GL_TEXTURE_2D, bloomFBO.getTexture("scene"))
-          mainSceneShader.setUniform1i("uSampler", 0)
+          blurShader.setUniform1i("uSampler", 0)
           drawScreenVBO()
         }
 
@@ -234,7 +243,7 @@ class GS_Game extends GameState {
           blurShader.setUniform1f("horizontal", 0.0f);
           glActiveTexture(GL_TEXTURE0)
           glBindTexture(GL_TEXTURE_2D, bloomFBO.getTexture("bloom_halfblur"))
-          mainSceneShader.setUniform1i("uSampler", 0)
+          blurShader.setUniform1i("uSampler", 0)
           drawScreenVBO()
         }
       blurShader.unbind()
@@ -254,11 +263,11 @@ class GS_Game extends GameState {
 
     mainSceneShader.bind()
       glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, bloomFBO.getTexture("scene"))
+      glBindTexture(GL_TEXTURE_2D, bloomFBO.getTexture("scene"))
       mainSceneShader.setUniform1i("uSampler", 0)
       drawScreenVBO()
     mainSceneShader.unbind()
 
-    //checkError
+    checkError
   }
 }
