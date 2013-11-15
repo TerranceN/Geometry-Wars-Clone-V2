@@ -5,6 +5,8 @@ import scala.math._
 import org.lwjgl.BufferUtils
 import java.nio.FloatBuffer
 
+import com.awesome.vectors._
+
 class Matrix4(var data:Array[Float]) {
   def this() = this(null:Array[Float])
   if (data == null || data.length != 16) {
@@ -221,6 +223,7 @@ object Matrix4 {
     return result
   }
 
+  def translate(v:Vector2):Matrix4 = translate(v.x, v.y, 0)
   def translate(tx:Float, ty:Float, tz:Float):Matrix4 = {
     val result = new Matrix4()
     result.data(12) = tx

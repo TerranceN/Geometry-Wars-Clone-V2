@@ -50,6 +50,8 @@ class GS_Game extends GameState {
 
   var bloomFBO:Framebuffer = null
 
+  var camera = new Camera()
+
   var wasMouse0Down = false
   var wasKeyBDown = false
 
@@ -173,17 +175,17 @@ class GS_Game extends GameState {
 
     gbuf.accelerationPass {
       accelerationShader.bind()
-        accelerationShader.setUniform2f("uPushPositions[0]", Mouse.getX.toFloat, Mouse.getY.toFloat)
-        accelerationShader.setUniform2f("uPushVelocity[0]", 0, 0)
-        accelerationShader.setUniform1f("uPushStrength[0]", -0.5f)
-        accelerationShader.setUniform1f("uPushSize[0]", 250f)
-        accelerationShader.setUniform1i("uNumPositions", 1);
-        //bulletList.zipWithIndex.foreach{ case (b, i) =>
-        //  accelerationShader.setUniform2f("uPushPositions[" + (i) + "]", b.position.x, b.position.y)
-        //  accelerationShader.setUniform2f("uPushVelocity[" + (i) + "]", b.velocity.x, b.velocity.y)
-        //  accelerationShader.setUniform1f("uPushStrength[" + (i) + "]", b.pushStrength)
-        //}
-        //accelerationShader.setUniform1i("uNumPositions", bulletList.size);
+        bulletList.zipWithIndex.foreach{ case (b, i) =>
+          accelerationShader.setUniform2f("uPushPositions[" + (i) + "]", b.position.x, b.position.y)
+          accelerationShader.setUniform2f("uPushVelocity[" + (i) + "]", b.velocity.x, b.velocity.y)
+          accelerationShader.setUniform1f("uPushStrength[" + (i) + "]", b.pushStrength)
+          accelerationShader.setUniform1f("uPushSize[" + (i) + "]", 25f)
+        }
+        accelerationShader.setUniform2f("uPushPositions[" + bulletList.size + "]", Mouse.getX.toFloat, Mouse.getY.toFloat)
+        accelerationShader.setUniform2f("uPushVelocity[" + bulletList.size + "]", 0, 0)
+        accelerationShader.setUniform1f("uPushStrength[" + bulletList.size + "]", -0.5f)
+        accelerationShader.setUniform1f("uPushSize[" + bulletList.size + "]", 150f)
+        accelerationShader.setUniform1i("uNumPositions", bulletList.size + 1);
         drawScreenVBO()
       accelerationShader.unbind()
     }
@@ -200,6 +202,8 @@ class GS_Game extends GameState {
 
     wasMouse0Down = Mouse.isButtonDown(0)
     wasKeyBDown = Keyboard.isKeyDown(Keyboard.KEY_B)
+
+    camera.moveTowardsCenter(new Vector2(Mouse.getX(), GLFrustum.screenHeight - Mouse.getY()), (0.5f / deltaTime).toFloat)
   }
 
   def checkError() {
@@ -221,6 +225,7 @@ class GS_Game extends GameState {
   def draw() = {
     glViewport(0, 0, GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt)
     GLFrustum.modelviewMatrix.setIdentity()
+    GLFrustum.modelviewMatrix = camera.getTransforms()
     glClear(GL_COLOR_BUFFER_BIT)
 
     bloomFBO.drawToTextures(List("scene")) {

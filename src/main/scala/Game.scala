@@ -34,8 +34,7 @@ object Game extends App {
         while (!exit) {
           var startTime:Long = 0
           gameStates.synchronized {
-            threadsExit = Display.isCloseRequested && !gameStates.isEmpty
-            exit = threadsExit
+            exit = Display.isCloseRequested && !gameStates.isEmpty
 
             startTime = System.nanoTime
             val currentState = gameStates.head
@@ -80,10 +79,10 @@ object Game extends App {
           e.printStackTrace()
         }
       } finally {
+        Display.destroy()
         gameStates.synchronized {
           threadsExit = true
         }
-        Display.destroy()
       }
     }
   }
