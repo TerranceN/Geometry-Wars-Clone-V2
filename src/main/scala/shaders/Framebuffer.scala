@@ -9,6 +9,10 @@ import org.lwjgl.opengl.GL20._
 import org.lwjgl.opengl.GL30._
 import org.lwjgl.BufferUtils
 
+import com.awesome.GLFrustum
+import com.awesome.matricies._
+import com.awesome.vectors._
+
 import java.nio.FloatBuffer
 import scala.collection.mutable.ArrayBuffer
 
@@ -18,6 +22,29 @@ class Framebuffer(val fboWidth:Int, val fboHeight:Int) {
   val textures:ArrayBuffer[TextureReference] = ArrayBuffer()
   var maxAttachmentId:Int = 0
   val id = glGenFramebuffers()
+
+  var fboVBO:Int = glGenBuffers()
+
+  initFBOVBO()
+
+  def initFBOVBO() {
+    val vertexBuffer = BufferUtils.createFloatBuffer(16)
+    vertexBuffer.put( 0.0f); vertexBuffer.put( 0.0f)
+    vertexBuffer.put( 0.0f); vertexBuffer.put( 1.0f)
+
+    vertexBuffer.put(fboWidth); vertexBuffer.put(0.0f)
+    vertexBuffer.put( 1.0f); vertexBuffer.put( 1.0f)
+
+    vertexBuffer.put(fboWidth); vertexBuffer.put(fboHeight)
+    vertexBuffer.put( 1.0f); vertexBuffer.put( 0.0f)
+
+    vertexBuffer.put( 0.0f); vertexBuffer.put(fboHeight)
+    vertexBuffer.put( 0.0f); vertexBuffer.put( 0.0f)
+    vertexBuffer.flip()
+
+    glBindBuffer(GL_ARRAY_BUFFER, fboVBO)
+    glBufferData(GL_ARRAY_BUFFER, vertexBuffer, GL_STATIC_DRAW)
+  }
 
   def delete: Unit = {
     var textureIds = textures map (_.id)
@@ -78,6 +105,47 @@ class Framebuffer(val fboWidth:Int, val fboHeight:Int) {
     }
 
     return None
+  }
+
+  def drawFBOQuad() { drawFBOQuad(new Vector2(0, 0), new Vector2(fboWidth, fboHeight)) }
+
+  def drawFBOQuad(lower:Vector2, upper:Vector2) {
+    GLFrustum.pushProjection()
+    GLFrustum.projectionMatrix = Matrix4.ortho(lower.x, upper.x, upper.y, lower.y, -1, 1)
+
+    GLFrustum.pushModelview()
+    GLFrustum.modelviewMatrix.setIdentity
+
+    val program = ShaderProgram.getActiveShader()
+
+    // if there's no shader program, there's nowhere to send the vertex data
+    if (program != null) {
+      GLFrustum.setMatricies()
+
+      val aCoordLocation = glGetAttribLocation(program.id, "aCoord")
+      val aTexCoordLocation = glGetAttribLocation(program.id, "aTexCoord")
+
+      glEnableVertexAttribArray(aCoordLocation)
+      if (aTexCoordLocation >= 0) {
+        glEnableVertexAttribArray(aTexCoordLocation)
+      }
+
+      glBindBuffer(GL_ARRAY_BUFFER, fboVBO)
+      glVertexAttribPointer(aCoordLocation, 3, GL_FLOAT, false, 4 * 4, 0)
+      if (aTexCoordLocation >= 0) {
+        glVertexAttribPointer(aTexCoordLocation, 2, GL_FLOAT, false, 4 * 4, 2 * 4)
+      }
+
+      glDrawArrays(GL_QUADS, 0, 4)
+
+      glDisableVertexAttribArray(aCoordLocation)
+      if (aTexCoordLocation >= 0) {
+        glDisableVertexAttribArray(aTexCoordLocation)
+      }
+    }
+
+    GLFrustum.popModelview()
+    GLFrustum.popProjection()
   }
 
   def drawToTextures(textureNames:List[String])(f: => Unit) {

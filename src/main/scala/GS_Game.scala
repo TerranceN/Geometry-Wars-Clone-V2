@@ -46,8 +46,8 @@ class GS_Game extends GameState {
   }
 
   val random = new Random
-  val screenVBO = glGenBuffers()
 
+  var screenFBO:Framebuffer = null
   var bloomFBO:Framebuffer = null
 
   var camera = new Camera()
@@ -86,68 +86,12 @@ class GS_Game extends GameState {
   gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 121, 71)
 
   def init() = {
-    setupScreenVBO()
-    bloomFBO = new Framebuffer(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt)
-    bloomFBO.newTexture("bloom", GL_RGBA32F, null)
-    bloomFBO.newTexture("scene", GL_RGBA32F, null)
-    bloomFBO.newTexture("bloom_halfblur", GL_RGBA16F, null)
-  }
+    screenFBO = new Framebuffer(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt)
+    screenFBO.newTexture("scene", GL_RGBA32F, null)
 
-  def setupScreenVBO() {
-    val vertexBuffer = BufferUtils.createFloatBuffer(16)
-    vertexBuffer.put( 0.0f); vertexBuffer.put( 0.0f)
-    vertexBuffer.put( 0.0f); vertexBuffer.put( 1.0f)
-
-    vertexBuffer.put(GLFrustum.screenWidth); vertexBuffer.put(0.0f)
-    vertexBuffer.put( 1.0f); vertexBuffer.put( 1.0f)
-
-    vertexBuffer.put(GLFrustum.screenWidth); vertexBuffer.put(GLFrustum.screenHeight)
-    vertexBuffer.put( 1.0f); vertexBuffer.put( 0.0f)
-
-    vertexBuffer.put( 0.0f); vertexBuffer.put(GLFrustum.screenHeight)
-    vertexBuffer.put( 0.0f); vertexBuffer.put( 0.0f)
-    vertexBuffer.flip()
-
-    Console.println(GLFrustum.screenWidth + ", " + GLFrustum.screenHeight)
-
-    glBindBuffer(GL_ARRAY_BUFFER, screenVBO)
-    glBufferData(GL_ARRAY_BUFFER, vertexBuffer, GL_STATIC_DRAW)
-  }
-
-  def drawScreenVBO() {
-    GLFrustum.pushProjection()
-    //GLFrustum.projectionMatrix.setIdentity
-
-    GLFrustum.pushModelview()
-    GLFrustum.modelviewMatrix.setIdentity
-
-    setMatricies()
-
-    val program = ShaderProgram.getActiveShader()
-
-    val aCoordLocation = glGetAttribLocation(program.id, "aCoord")
-    val aTexCoordLocation = glGetAttribLocation(program.id, "aTexCoord")
-
-    glEnableVertexAttribArray(aCoordLocation)
-    if (aTexCoordLocation >= 0) {
-      glEnableVertexAttribArray(aTexCoordLocation)
-    }
-
-    glBindBuffer(GL_ARRAY_BUFFER, screenVBO)
-    glVertexAttribPointer(aCoordLocation, 3, GL_FLOAT, false, 4 * 4, 0)
-    if (aTexCoordLocation >= 0) {
-      glVertexAttribPointer(aTexCoordLocation, 2, GL_FLOAT, false, 4 * 4, 2 * 4)
-    }
-
-    glDrawArrays(GL_QUADS, 0, 4)
-
-    glDisableVertexAttribArray(aCoordLocation)
-    if (aTexCoordLocation >= 0) {
-      glDisableVertexAttribArray(aTexCoordLocation)
-    }
-
-    GLFrustum.popModelview()
-    GLFrustum.popProjection()
+    bloomFBO = new Framebuffer(screenFBO.fboWidth, screenFBO.fboHeight)
+    bloomFBO.newTexture("bloom", GL_RGBA, null)
+    bloomFBO.newTexture("bloom_halfblur", GL_RGBA, null)
   }
 
   def update(deltaTime:Double) = {
@@ -175,18 +119,20 @@ class GS_Game extends GameState {
 
     gbuf.accelerationPass {
       accelerationShader.bind()
+        var mouse = new Vector2(Mouse.getX, GLFrustum.screenHeight - Mouse.getY)
+        var transformedMouse = mouse.transform(camera.getTransforms.inverse)
         bulletList.zipWithIndex.foreach{ case (b, i) =>
           accelerationShader.setUniform2f("uPushPositions[" + (i) + "]", b.position.x, b.position.y)
           accelerationShader.setUniform2f("uPushVelocity[" + (i) + "]", b.velocity.x, b.velocity.y)
           accelerationShader.setUniform1f("uPushStrength[" + (i) + "]", b.pushStrength)
           accelerationShader.setUniform1f("uPushSize[" + (i) + "]", 25f)
         }
-        accelerationShader.setUniform2f("uPushPositions[" + bulletList.size + "]", Mouse.getX.toFloat, Mouse.getY.toFloat)
+        accelerationShader.setUniform2f("uPushPositions[" + bulletList.size + "]", transformedMouse.x, GLFrustum.screenHeight - transformedMouse.y)
         accelerationShader.setUniform2f("uPushVelocity[" + bulletList.size + "]", 0, 0)
         accelerationShader.setUniform1f("uPushStrength[" + bulletList.size + "]", -0.5f)
         accelerationShader.setUniform1f("uPushSize[" + bulletList.size + "]", 150f)
         accelerationShader.setUniform1i("uNumPositions", bulletList.size + 1);
-        drawScreenVBO()
+        gbuf.accelerationFBO.drawFBOQuad()
       accelerationShader.unbind()
     }
 
@@ -228,7 +174,7 @@ class GS_Game extends GameState {
     GLFrustum.modelviewMatrix = camera.getTransforms()
     glClear(GL_COLOR_BUFFER_BIT)
 
-    bloomFBO.drawToTextures(List("scene")) {
+    screenFBO.drawToTextures(List("scene")) {
       glClear(GL_COLOR_BUFFER_BIT)
       gbuf.draw()
     }
@@ -239,9 +185,9 @@ class GS_Game extends GameState {
         bloomFBO.drawToTextures(List("bloom_halfblur")) {
           blurShader.setUniform1f("horizontal", 1.0f);
           glActiveTexture(GL_TEXTURE0)
-          glBindTexture(GL_TEXTURE_2D, bloomFBO.getTexture("scene"))
+          glBindTexture(GL_TEXTURE_2D, screenFBO.getTexture("scene"))
           blurShader.setUniform1i("uSampler", 0)
-          drawScreenVBO()
+          bloomFBO.drawFBOQuad()
         }
 
         bloomFBO.drawToTextures(List("bloom")) {
@@ -249,28 +195,28 @@ class GS_Game extends GameState {
           glActiveTexture(GL_TEXTURE0)
           glBindTexture(GL_TEXTURE_2D, bloomFBO.getTexture("bloom_halfblur"))
           blurShader.setUniform1i("uSampler", 0)
-          drawScreenVBO()
+          bloomFBO.drawFBOQuad()
         }
       blurShader.unbind()
 
-      bloomFBO.drawToTextures(List("scene")) {
+      screenFBO.drawToTextures(List("scene")) {
         additiveShader.bind()
           glActiveTexture(GL_TEXTURE0)
           glBindTexture(GL_TEXTURE_2D, bloomFBO.getTexture("bloom"))
           glActiveTexture(GL_TEXTURE1)
-          glBindTexture(GL_TEXTURE_2D, bloomFBO.getTexture("scene"))
+          glBindTexture(GL_TEXTURE_2D, screenFBO.getTexture("scene"))
           additiveShader.setUniform1i("uSampler", 0)
           additiveShader.setUniform1i("uExistingSampler", 1)
-          drawScreenVBO()
+          bloomFBO.drawFBOQuad()
         additiveShader.unbind()
       }
     }
 
     mainSceneShader.bind()
       glActiveTexture(GL_TEXTURE0)
-      glBindTexture(GL_TEXTURE_2D, bloomFBO.getTexture("scene"))
+      glBindTexture(GL_TEXTURE_2D, screenFBO.getTexture("scene"))
       mainSceneShader.setUniform1i("uSampler", 0)
-      drawScreenVBO()
+      screenFBO.drawFBOQuad()
     mainSceneShader.unbind()
 
     checkError
