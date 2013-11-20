@@ -104,8 +104,8 @@ class GBuffer {
   }
 
   def loadShaders() {
-    particleUpdateShader = new ShaderProgram("shaders/particleUpdate.vert", "shaders/particleUpdate.frag")
-    particleDrawShader = new ShaderProgram("shaders/particleDraw.vert", "shaders/particleDraw.frag")
+    particleUpdateShader = new ShaderProgram("shaders/gridParticleUpdate.vert", "shaders/gridParticleUpdate.frag")
+    particleDrawShader = new ShaderProgram("shaders/gridParticleDraw.vert", "shaders/gridParticleDraw.frag")
   }
 
   def randRange(min:Float, max:Float):Float = {

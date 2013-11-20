@@ -26,6 +26,8 @@ class Matrix4(var data:Array[Float]) {
     return new Matrix4(data)
   }
 
+  def *(other:Matrix4) = this.multiply(other)
+
   def multiplyBy(other:Matrix4) {
     val result = this.multiply(other)
     data = result.data

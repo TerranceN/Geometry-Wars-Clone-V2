@@ -16,13 +16,13 @@ void main() {
     vec2 oldVelocity = texture2D(uVelocitySampler, texCoord).xy;
     ivec2 accTexSize = textureSize(uAccelerationSampler, 0);
     vec2 diffToCenter = oldOffset;
-    vec2 acceleration = texture2D(uAccelerationSampler, vec2((oldPosition.x + oldOffset.x) / accTexSize.x, (oldPosition.y + oldOffset.y) / accTexSize.y)).xy;
+    vec2 acceleration = texture2D(uAccelerationSampler, vec2((oldPosition.x + oldOffset.x) / accTexSize.x, 1 - ((oldPosition.y + oldOffset.y) / accTexSize.y))).xy;
+    acceleration = vec2(acceleration.x, -acceleration.y);
     //vec2 acceleration = vec2(1, 1);
 
     vec2 newOffset = vec2(0);
     vec2 newVelocity = vec2(0);
     newOffset = oldOffset + oldVelocity * uDeltaTime;
-    float offsetLength = length(newOffset);
     newVelocity = oldVelocity + (acceleration * uDeltaTime * 2000 - diffToCenter * uDeltaTime * 10) * 10 - oldVelocity * uDeltaTime * 10;
 
     gl_FragData[0] = vec4(newOffset, 0, 1);

@@ -11,14 +11,16 @@ uniform float uPushStrength[MAX_POSITIONS];
 uniform vec2 uPushVelocity[MAX_POSITIONS];
 uniform int uNumPositions;
 
+uniform vec2 uScreenSize;
+
 void main() {
     vec2 final_color = vec2(0);
 
     int positionsToDraw = min(uNumPositions, MAX_POSITIONS);
     for (int i = 0; i < positionsToDraw; i++) {
         float size = uPushSize[i];
-        vec2 diff = (fragCoord - uPushPositions[i]);
-        float scale = dot(-normalize(diff), normalize(uPushVelocity[i]));
+        vec2 diff = (fragCoord - vec2(uPushPositions[i].x, uScreenSize.y - uPushPositions[i].y));
+        float scale = dot(normalize(diff), normalize(vec2(-uPushVelocity[i].x, uPushVelocity[i].y)));
         if (scale > 0) {
             scale = 0;
         } else {

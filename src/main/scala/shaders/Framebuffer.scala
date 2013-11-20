@@ -111,10 +111,13 @@ class Framebuffer(val fboWidth:Int, val fboHeight:Int) {
 
   def drawFBOQuad(lower:Vector2, upper:Vector2) {
     GLFrustum.pushProjection()
-    GLFrustum.projectionMatrix = Matrix4.ortho(lower.x, upper.x, upper.y, lower.y, -1, 1)
+    //GLFrustum.projectionMatrix = Matrix4.ortho(lower.x, upper.x, upper.y, lower.y, -1, 1)
+    GLFrustum.projectionMatrix = Matrix4.ortho(0, fboWidth, fboHeight, 0, -1, 1)
 
     GLFrustum.pushModelview()
-    GLFrustum.modelviewMatrix.setIdentity
+    //GLFrustum.modelviewMatrix.setIdentity
+    val diff = upper - lower
+    GLFrustum.modelviewMatrix = Matrix4.translate(new Vector2(lower.x, lower.y)) * Matrix4.scale(diff.x / fboWidth, diff.y / fboHeight, 1)
 
     val program = ShaderProgram.getActiveShader()
 
@@ -131,7 +134,7 @@ class Framebuffer(val fboWidth:Int, val fboHeight:Int) {
       }
 
       glBindBuffer(GL_ARRAY_BUFFER, fboVBO)
-      glVertexAttribPointer(aCoordLocation, 3, GL_FLOAT, false, 4 * 4, 0)
+      glVertexAttribPointer(aCoordLocation, 2, GL_FLOAT, false, 4 * 4, 0)
       if (aTexCoordLocation >= 0) {
         glVertexAttribPointer(aTexCoordLocation, 2, GL_FLOAT, false, 4 * 4, 2 * 4)
       }

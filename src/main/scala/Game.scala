@@ -1,6 +1,5 @@
 package com.awesome 
 
-// What GL version you plan on using
 import org.lwjgl.opengl.GL11._
 import org.lwjgl.opengl.{
   Display, 
@@ -9,16 +8,35 @@ import org.lwjgl.opengl.{
 import org.lwjgl.input.Keyboard
 import Keyboard._
 import scala.collection.mutable.Stack
+import scala.collection.mutable.Queue
 
 object Game extends App {
   Console.println(System.getProperty("java.library.path"))
   val updateFPSCap = 500
-  val drawFPSCap = 500
+  val drawFPSCap = 60
   var gameStates = new Stack[GameState]
   gameStates.push(new GS_Init)
 
   var threadsExit = false
   var shouldDraw = true
+
+  val numToAverage = 30
+  val updateTimeQueue = new Queue[Double]
+  var averageUpdateTime:Double = 0
+
+  def addToUpdateTimeQueue(time:Double) {
+    updateTimeQueue += time
+    val n = updateTimeQueue.length
+    if (n <= numToAverage) {
+      if (n > 1) {
+        averageUpdateTime = (averageUpdateTime * (n - 1) + time) / n
+      } else {
+        averageUpdateTime = time
+      }
+    } else {
+      averageUpdateTime = (averageUpdateTime * numToAverage - updateTimeQueue.dequeue() + time) / numToAverage
+    }
+  }
 
   class GameRunner extends Thread {
     override def run() = {
@@ -39,7 +57,7 @@ object Game extends App {
             startTime = System.nanoTime
             val currentState = gameStates.head
             // update the current state
-            currentState.update(lastFrameTime / 1000000000d)
+            currentState.update(averageUpdateTime)
 
             // if that update caused the state to die, remove to from the stack
             // otherwise, draw the state
@@ -68,11 +86,12 @@ object Game extends App {
           fpsFrameCount += 1
           val fpsTimeDiff = System.nanoTime - fpsCountStart
           if (fpsTimeDiff >= 1000000000) {
-            Console.println("fps: " + (1000000000d / (fpsTimeDiff / fpsFrameCount)))
+            Console.println("update fps: " + (1000000000d / (fpsTimeDiff / fpsFrameCount)))
             fpsFrameCount = 0
             fpsCountStart = System.nanoTime
           }
           lastFrameTime = System.nanoTime - startTime
+          addToUpdateTimeQueue(lastFrameTime / 1000000000d)
         }
       } catch {
         case e:Exception => {
@@ -105,7 +124,7 @@ object Game extends App {
         fpsFrameCount += 1
         val fpsTimeDiff = System.nanoTime - fpsCountStart
         if (fpsTimeDiff >= 1000000000) {
-          Console.println("fps: " + (1000000000d / (fpsTimeDiff / fpsFrameCount)))
+          Console.println("draw fps: " + (1000000000d / (fpsTimeDiff / fpsFrameCount)))
           fpsFrameCount = 0
           fpsCountStart = System.nanoTime
         }
