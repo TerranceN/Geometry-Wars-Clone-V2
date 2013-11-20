@@ -65,10 +65,12 @@ object Game extends App {
               gameStates.pop
             }
 
+            Display.processMessages()
+
             // since updating includes opengl calls and runs much faster, draw is run from here
             if (shouldDraw) {
               currentState.draw
-              Display.update
+              Display.swapBuffers
               shouldDraw = false
             }
 

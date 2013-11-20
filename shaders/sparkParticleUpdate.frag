@@ -17,6 +17,17 @@ void main() {
     newPosition = oldPosition + oldVelocity * uDeltaTime;
     newVelocity = oldVelocity - oldVelocity * uDeltaTime * 4;
 
+    float bounceDampening = 0.75;
+
+    if (newPosition.x < 0) {
+        newPosition.x = -newPosition.x;
+        newVelocity.x = -newVelocity.x * bounceDampening;
+    }
+    if (newPosition.y < 0) {
+        newPosition.y = -newPosition.y;
+        newVelocity.y = -newVelocity.y * bounceDampening;
+    }
+
     gl_FragData[0] = vec4(newPosition, 0, 1);
     gl_FragData[1] = vec4(newVelocity, 0, 1);
 }

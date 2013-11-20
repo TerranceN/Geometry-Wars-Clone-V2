@@ -43,10 +43,12 @@ class SparkParticleSystem(pageSize:Int, numPages:Int) extends ParticleSystem(pag
     new FragmentShader("shaders/sparkParticleSet.frag")
   )
 
-  def updatePage(page:Int, position:Vector2) {
+  def updatePage(page:Int, position:Vector2) { updatePage(page, position, new Vector2(2)) }
+  def updatePage(page:Int, position:Vector2, velocity:Vector2) {
     fbo.drawToTextures(List("positions", "velocities")) {
       setShader.bind()
         setShader.setUniform2f("uPosition", position.x, GLFrustum.screenHeight - position.y)
+        setShader.setUniform2f("uVelocity", velocity.x, -velocity.y)
           fbo.drawFBOQuad(new Vector2(0, page), new Vector2(pageSize, page + 1))
       setShader.unbind()
     }

@@ -24,7 +24,7 @@ import lighting._
 import matricies._
 
 class GS_Game extends GameState {
-  val sparkSystem = new SparkParticleSystem(500, 100)
+  val sparkSystem = new SparkParticleSystem(250, 50)
   //class SparkEmitter(val center:Vector2, val radius:Float, val maxLife:Float) {
   //  def update(deltaTime:Double) {
   //  }
@@ -51,7 +51,7 @@ class GS_Game extends GameState {
         if (position.x < 0 || position.y < 0 || position.x > GLFrustum.screenWidth || position.y > GLFrustum.screenHeight) {
           isAlive = false
           var pages = sparkSystem.allocate(sparkSystem.pageSize)
-          pages map (x => sparkSystem.updatePage(x, position))
+          pages map (x => sparkSystem.updatePage(x, position, velocity))
           sparkSystem.deallocate(pages)
         }
       }
@@ -95,11 +95,15 @@ class GS_Game extends GameState {
 
   var bulletList:List[Bullet] = Nil
 
+  var gameSize = new Vector2(1500, 1500)
+
+  camera.setBoundaries(new Vector2(0), gameSize - new Vector2(GLFrustum.screenWidth, GLFrustum.screenHeight))
+
   var gbuf = new GBuffer()
   //gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 241, 141)
   //gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 121, 71)
   //gbuf.setup(2560, 2560, 481, 481)
-  gbuf.setup(1280, 1280, 121, 121)
+  gbuf.setup(gameSize.x.toInt, gameSize.y.toInt, 121, 121)
 
   def init() = {
     screenFBO = new Framebuffer(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt)
@@ -123,7 +127,7 @@ class GS_Game extends GameState {
 
     if (!wasMouse0Down && Mouse.isButtonDown(0)) {
       var middle = new Vector2(GLFrustum.screenWidth, GLFrustum.screenHeight) * 0.5f
-      var mouse = new Vector2(Mouse.getX, Mouse.getY)
+      var mouse = newMouse
       var diff = mouse - middle
       var angle = atan2(diff.y, diff.x)
       var angles = List(-1, 0, 1)
@@ -175,7 +179,11 @@ class GS_Game extends GameState {
     wasMouse1Down = Mouse.isButtonDown(1)
     wasKeyBDown = Keyboard.isKeyDown(Keyboard.KEY_B)
 
-    camera.moveTowardsCenter(new Vector2(Mouse.getX(), GLFrustum.screenHeight - Mouse.getY()), (0.5f / deltaTime).toFloat)
+    var lookAt = new Vector2(
+      mouse.x / GLFrustum.screenWidth * gameSize.x,
+      mouse.y / GLFrustum.screenHeight * gameSize.y
+    )
+    camera.moveTowardsCenter(lookAt, (0.5f / deltaTime).toFloat)
   }
 
   def checkError() {

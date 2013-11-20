@@ -13,7 +13,7 @@ void main() {
     float highSpeed = 1500;
     vec2 pos = (uPosition / 100);
     pos = vec2(mod(pos.x, 1), mod(pos.y, 1));
-    float rx = rand(texCoord + pos);
+    float rx = rand(texCoord + uPosition);
     float ry = rand(vec2(rx));
     vec2 vel = vec2(rx - 0.5, ry - 0.5);
     float rs = rand(vec2(ry));

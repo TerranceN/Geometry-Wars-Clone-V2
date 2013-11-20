@@ -120,12 +120,12 @@ class GBuffer {
     fbo = new Framebuffer(numParticlesWidth, numParticlesHeight)
 
     var initPositions = BufferUtils.createFloatBuffer(numParticlesWidth * numParticlesHeight * 4)
-    var xSize:Double = screenWidth.toFloat / (numParticlesWidth + 1)
-    var ySize:Double = screenHeight.toFloat / (numParticlesHeight + 1)
+    var xSize:Double = screenWidth.toFloat / (numParticlesWidth - 1)
+    var ySize:Double = screenHeight.toFloat / (numParticlesHeight - 1)
     for (j <- 0 until numParticlesHeight) {
       for (i <- 0 until numParticlesWidth) {
-        var x:Float = ((i + 1) * xSize).toFloat
-        var y:Float = ((j + 1) * ySize).toFloat
+        var x:Float = ((i + 0) * xSize).toFloat
+        var y:Float = ((j + 0) * ySize).toFloat
         initPositions.put(x)
         initPositions.put(y)
         initPositions.put(0)
