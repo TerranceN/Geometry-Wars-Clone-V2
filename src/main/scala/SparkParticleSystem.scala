@@ -9,10 +9,14 @@ import org.lwjgl.opengl.GL15._
 import org.lwjgl.opengl.GL20._
 import org.lwjgl.opengl.GL30._
 
+import scala.util.Random;
+
 import shaders._
 import vectors._
 
 class SparkParticleSystem(pageSize:Int, numPages:Int) extends ParticleSystem(pageSize, numPages) {
+  val random = new Random()
+
   val vbo = glGenBuffers()
 
   var vertexBuffer = BufferUtils.createFloatBuffer(pageSize * numPages * 3 * 2)
@@ -47,14 +51,15 @@ class SparkParticleSystem(pageSize:Int, numPages:Int) extends ParticleSystem(pag
   def updatePage(page:Int, position:Vector2, velocity:Vector2) {
     fbo.drawToTextures(List("positions", "velocities")) {
       setShader.bind()
-        setShader.setUniform2f("uPosition", position.x, GLFrustum.screenHeight - position.y)
-        setShader.setUniform2f("uVelocity", velocity.x, -velocity.y)
+        setShader.setUniform2f("uPosition", position.x, position.y)
+        setShader.setUniform2f("uVelocity", velocity.x, velocity.y)
+        setShader.setUniform2f("uRandomSeed", random.nextFloat(), random.nextFloat())
           fbo.drawFBOQuad(new Vector2(0, page), new Vector2(pageSize, page + 1))
       setShader.unbind()
     }
   }
 
-  override def update(deltaTime:Double) {
+  def update(deltaTime:Double, gameSize:Vector2) {
     fbo.drawToTextures(List("positions", "velocities")) {
       updateShader.bind()
         val program = ShaderProgram.getActiveShader()
@@ -64,6 +69,7 @@ class SparkParticleSystem(pageSize:Int, numPages:Int) extends ParticleSystem(pag
         glBindTexture(GL_TEXTURE_2D, fbo.getTexture("velocities"))
         program.setUniform1i("uPositionSampler", 0)
         program.setUniform1i("uVelocitySampler", 1)
+        program.setUniform2f("uGameSize", gameSize.x, gameSize.y)
         program.setUniform1f("uDeltaTime", deltaTime.toFloat)
 
         fbo.drawFBOQuad()

@@ -25,6 +25,7 @@ import matricies._
 
 class GS_Game extends GameState {
   val sparkSystem = new SparkParticleSystem(250, 50)
+  var gameSize = new Vector2(1500, 1500)
   //class SparkEmitter(val center:Vector2, val radius:Float, val maxLife:Float) {
   //  def update(deltaTime:Double) {
   //  }
@@ -48,7 +49,7 @@ class GS_Game extends GameState {
         timeAlive += deltaTime.toFloat
         position += velocity * deltaTime.toFloat
 
-        if (position.x < 0 || position.y < 0 || position.x > GLFrustum.screenWidth || position.y > GLFrustum.screenHeight) {
+        if (position.x < 0 || position.y < 0 || position.x > gameSize.x || position.y > gameSize.y) {
           isAlive = false
           var pages = sparkSystem.allocate(sparkSystem.pageSize)
           pages map (x => sparkSystem.updatePage(x, position, velocity))
@@ -95,7 +96,6 @@ class GS_Game extends GameState {
 
   var bulletList:List[Bullet] = Nil
 
-  var gameSize = new Vector2(1500, 1500)
 
   camera.setBoundaries(new Vector2(0), gameSize - new Vector2(GLFrustum.screenWidth, GLFrustum.screenHeight))
 
@@ -117,7 +117,6 @@ class GS_Game extends GameState {
   def update(deltaTime:Double) = {
     var mouse = new Vector2(Mouse.getX, GLFrustum.screenHeight - Mouse.getY)
     var transformedMouse = mouse.transform(camera.getTransforms.inverse)
-    var newMouse = new Vector2(transformedMouse.x, GLFrustum.screenHeight - transformedMouse.y)
 
     angle += 5 * deltaTime.toFloat
 
@@ -126,20 +125,20 @@ class GS_Game extends GameState {
     }
 
     if (!wasMouse0Down && Mouse.isButtonDown(0)) {
-      var middle = new Vector2(GLFrustum.screenWidth, GLFrustum.screenHeight) * 0.5f
-      var mouse = newMouse
+      var middle = gameSize * 0.5f
+      var mouse = transformedMouse
       var diff = mouse - middle
       var angle = atan2(diff.y, diff.x)
       var angles = List(-1, 0, 1)
       for (i <- angles) {
         var newAngle = angle + Pi / 90 * 2 * i
-        bulletList = new Bullet(middle, new Vector2(cos(newAngle).toFloat, sin(newAngle).toFloat) * 700) :: bulletList
+        bulletList = new Bullet(middle, new Vector2(cos(newAngle).toFloat, sin(newAngle).toFloat) * 1000) :: bulletList
       }
     }
 
-    if (!wasMouse1Down && Mouse.isButtonDown(1)) {
+    if ((!wasMouse1Down && Mouse.isButtonDown(1)) || Mouse.isButtonDown(2)) {
       var pages = sparkSystem.allocate(sparkSystem.pageSize)
-      pages map (x => sparkSystem.updatePage(x, newMouse))
+      pages map (x => sparkSystem.updatePage(x, transformedMouse))
       sparkSystem.deallocate(pages)
     }
 
@@ -155,7 +154,7 @@ class GS_Game extends GameState {
           accelerationShader.setUniform1f("uPushStrength[" + (i) + "]", b.pushStrength)
           accelerationShader.setUniform1f("uPushSize[" + (i) + "]", 50f)
         }
-        accelerationShader.setUniform2f("uPushPositions[" + bulletList.size + "]", transformedMouse.x, GLFrustum.screenHeight - transformedMouse.y)
+        accelerationShader.setUniform2f("uPushPositions[" + bulletList.size + "]", transformedMouse.x, transformedMouse.y)
         //accelerationShader.setUniform2f("uPushPositions[" + bulletList.size + "]", Mouse.getX, Mouse.getY)
         accelerationShader.setUniform2f("uPushVelocity[" + bulletList.size + "]", 0, 0)
         accelerationShader.setUniform1f(
@@ -171,7 +170,7 @@ class GS_Game extends GameState {
 
     gbuf.update(deltaTime)
 
-    sparkSystem.update(deltaTime)
+    sparkSystem.update(deltaTime, gameSize)
 
     bulletList = bulletList filter (_.isAlive)
 
@@ -220,26 +219,30 @@ class GS_Game extends GameState {
     glDisable(GL_BLEND);
 
     if (bloomEnabled) {
-      blurShader.bind()
-        blurShader.setUniform1f("uBlurSize", 1.0f);
-        bloomFBO.drawToTextures(List("bloom_halfblur")) {
-          glClear(GL_COLOR_BUFFER_BIT)
-          blurShader.setUniform1f("horizontal", 1.0f);
-          glActiveTexture(GL_TEXTURE0)
-          glBindTexture(GL_TEXTURE_2D, screenFBO.getTexture("scene"))
-          blurShader.setUniform1i("uSampler", 0)
-          bloomFBO.drawFBOQuad()
-        }
+      var input = screenFBO.getTexture("scene")
+      for (i <- 0 until 5) {
+        blurShader.bind()
+          blurShader.setUniform1f("uBlurSize", 1.0f);
+          bloomFBO.drawToTextures(List("bloom_halfblur")) {
+            glClear(GL_COLOR_BUFFER_BIT)
+            blurShader.setUniform1f("horizontal", 1.0f);
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, input)
+            blurShader.setUniform1i("uSampler", 0)
+            bloomFBO.drawFBOQuad()
+          }
 
-        bloomFBO.drawToTextures(List("bloom")) {
-          glClear(GL_COLOR_BUFFER_BIT)
-          blurShader.setUniform1f("horizontal", 0.0f);
-          glActiveTexture(GL_TEXTURE0)
-          glBindTexture(GL_TEXTURE_2D, bloomFBO.getTexture("bloom_halfblur"))
-          blurShader.setUniform1i("uSampler", 0)
-          bloomFBO.drawFBOQuad()
-        }
-      blurShader.unbind()
+          bloomFBO.drawToTextures(List("bloom")) {
+            glClear(GL_COLOR_BUFFER_BIT)
+            blurShader.setUniform1f("horizontal", 0.0f);
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, bloomFBO.getTexture("bloom_halfblur"))
+            blurShader.setUniform1i("uSampler", 0)
+            bloomFBO.drawFBOQuad()
+          }
+        blurShader.unbind()
+        input = bloomFBO.getTexture("bloom")
+      }
 
       screenFBO.drawToTextures(List("scene")) {
         additiveShader.bind()

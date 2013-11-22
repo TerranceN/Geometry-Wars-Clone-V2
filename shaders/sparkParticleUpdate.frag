@@ -7,6 +7,7 @@ uniform sampler2D uPositionSampler;
 uniform sampler2D uVelocitySampler;
 
 uniform float uDeltaTime;
+uniform vec2 uGameSize;
 
 void main() {
     vec2 oldPosition = texture2D(uPositionSampler, texCoord).xy;
@@ -25,6 +26,14 @@ void main() {
     }
     if (newPosition.y < 0) {
         newPosition.y = -newPosition.y;
+        newVelocity.y = -newVelocity.y * bounceDampening;
+    }
+    if (newPosition.x > uGameSize.x) {
+        newPosition.x = 2 * uGameSize.x - newPosition.x;
+        newVelocity.x = -newVelocity.x * bounceDampening;
+    }
+    if (newPosition.y > uGameSize.y) {
+        newPosition.y = 2 * uGameSize.y - newPosition.y;
         newVelocity.y = -newVelocity.y * bounceDampening;
     }
 

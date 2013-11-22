@@ -19,11 +19,19 @@ void main() {
      */
 
     float weights[5];
+    // Gaussian blur
     weights[0] = 70.0 / 256;
     weights[1] = 56.0 / 256;
     weights[2] = 28.0 / 256;
     weights[3] =  8.0 / 256;
     weights[4] =  1.0 / 256;
+
+    // Box blur
+    //weights[0] = 1.0 / 9;
+    //weights[1] = 1.0 / 9;
+    //weights[2] = 1.0 / 9;
+    //weights[3] = 1.0 / 9;
+    //weights[4] = 1.0 / 9;
 
     vec2 imageSize = textureSize(uSampler, 0);
 

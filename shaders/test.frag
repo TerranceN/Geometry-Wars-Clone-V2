@@ -19,8 +19,8 @@ void main() {
     int positionsToDraw = min(uNumPositions, MAX_POSITIONS);
     for (int i = 0; i < positionsToDraw; i++) {
         float size = uPushSize[i];
-        vec2 diff = (fragCoord - vec2(uPushPositions[i].x, uScreenSize.y - uPushPositions[i].y));
-        float scale = dot(normalize(diff), normalize(vec2(-uPushVelocity[i].x, uPushVelocity[i].y)));
+        vec2 diff = fragCoord - uPushPositions[i];
+        float scale = -dot(normalize(diff), normalize(uPushVelocity[i]));
         if (scale > 0) {
             scale = 0;
         } else {

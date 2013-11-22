@@ -12,7 +12,7 @@ import scala.collection.mutable.Queue
 
 object Game extends App {
   Console.println(System.getProperty("java.library.path"))
-  val updateFPSCap = 500
+  val updateFPSCap = 60
   val drawFPSCap = 60
   var gameStates = new Stack[GameState]
   gameStates.push(new GS_Init)
@@ -20,7 +20,7 @@ object Game extends App {
   var threadsExit = false
   var shouldDraw = true
 
-  val numToAverage = 30
+  val numToAverage = 10
   val updateTimeQueue = new Queue[Double]
   var averageUpdateTime:Double = 0
 
