@@ -58,13 +58,111 @@ class GS_Game extends GameState {
       }
     }
   }
+  var camera = new Camera()
+  class Boundary(val padding:Float) {
+    camera.setBoundaries(new Vector2(-padding), gameSize - new Vector2(GLFrustum.screenWidth, GLFrustum.screenHeight) + new Vector2(padding))
+
+    val primitiveShader = new ShaderProgram(
+      new VertexShader("shaders/primitiveWithColor.vert"),
+      new FragmentShader("shaders/primitiveWithColor.frag")
+    )
+
+    val borderVBO = glGenBuffers()
+    initBorderVBO()
+
+    val blackedOutAreasVBO = glGenBuffers()
+    initBlackedOutAreasVBO()
+
+    def initBorderVBO() {
+      val buffer = BufferUtils.createFloatBuffer(5 * 2)
+      buffer.put(0); buffer.put(0)
+      buffer.put(gameSize.x); buffer.put(0)
+      buffer.put(gameSize.x); buffer.put(gameSize.y)
+      buffer.put(0); buffer.put(gameSize.y)
+      buffer.put(0); buffer.put(0)
+      buffer.flip()
+
+      glBindBuffer(GL_ARRAY_BUFFER, borderVBO)
+      glBufferData(GL_ARRAY_BUFFER, buffer, GL_STATIC_DRAW)
+    }
+
+    def initBlackedOutAreasVBO() {
+      val buffer = BufferUtils.createFloatBuffer(4 * 4 * 2)
+      buffer.put(-padding); buffer.put(-padding)
+      buffer.put(0); buffer.put(0)
+      buffer.put(gameSize.x); buffer.put(0)
+      buffer.put(gameSize.x + padding); buffer.put(-padding)
+
+      buffer.put(gameSize.x + padding); buffer.put(-padding)
+      buffer.put(gameSize.x); buffer.put(0)
+      buffer.put(gameSize.x); buffer.put(gameSize.y)
+      buffer.put(gameSize.x + padding); buffer.put(gameSize.y + padding)
+
+      buffer.put(gameSize.x + padding); buffer.put(gameSize.y + padding)
+      buffer.put(gameSize.x); buffer.put(gameSize.y)
+      buffer.put(0); buffer.put(gameSize.y)
+      buffer.put(-padding); buffer.put(gameSize.y + padding)
+
+      buffer.put(-padding); buffer.put(gameSize.y + padding)
+      buffer.put(0); buffer.put(gameSize.y)
+      buffer.put(0); buffer.put(0)
+      buffer.put(-padding); buffer.put(-padding)
+
+      buffer.flip()
+
+      glBindBuffer(GL_ARRAY_BUFFER, blackedOutAreasVBO)
+      glBufferData(GL_ARRAY_BUFFER, buffer, GL_STATIC_DRAW)
+    }
+
+    def drawBorder() {
+      val program = ShaderProgram.getActiveShader()
+
+      val aCoordLocation = glGetAttribLocation(program.id, "aCoord")
+      program.setUniform4f("uColor", 1, 1, 1, 1)
+
+      glEnableVertexAttribArray(aCoordLocation)
+
+      glBindBuffer(GL_ARRAY_BUFFER, borderVBO)
+      glVertexAttribPointer(aCoordLocation, 2, GL_FLOAT, false, 2 * 4, 0)
+
+      glDrawArrays(GL_LINE_STRIP, 0, 5)
+
+      glDisableVertexAttribArray(aCoordLocation)
+    }
+
+    def drawBlackedOutAreas() {
+      val program = ShaderProgram.getActiveShader()
+
+      val aCoordLocation = glGetAttribLocation(program.id, "aCoord")
+      program.setUniform4f("uColor", 0, 0, 0, 1)
+
+      glEnableVertexAttribArray(aCoordLocation)
+
+      glBindBuffer(GL_ARRAY_BUFFER, blackedOutAreasVBO)
+      glVertexAttribPointer(aCoordLocation, 2, GL_FLOAT, false, 2 * 4, 0)
+
+      glDrawArrays(GL_QUADS, 0, 4 * 4)
+
+      glDisableVertexAttribArray(aCoordLocation)
+    }
+
+    def draw() {
+      primitiveShader.bind()
+        GLFrustum.setMatricies()
+        glDisable(GL_BLEND)
+        // black out edges
+        drawBlackedOutAreas()
+        // add white border
+        drawBorder()
+        glEnable(GL_BLEND)
+      primitiveShader.unbind()
+    }
+  }
 
   val random = new Random
 
   var screenFBO:Framebuffer = null
   var bloomFBO:Framebuffer = null
-
-  var camera = new Camera()
 
   var wasMouse0Down = false
   var wasMouse1Down = false
@@ -92,12 +190,12 @@ class GS_Game extends GameState {
     new FragmentShader("shaders/additive.frag")
   )
 
+  var boundary = new Boundary(20)
+
   var angle:Double = 0
 
   var bulletList:List[Bullet] = Nil
 
-
-  camera.setBoundaries(new Vector2(0), gameSize - new Vector2(GLFrustum.screenWidth, GLFrustum.screenHeight))
 
   var gbuf = new GBuffer()
   //gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 241, 141)
@@ -114,7 +212,9 @@ class GS_Game extends GameState {
     bloomFBO.newTexture("bloom_halfblur", GL_RGBA, null)
   }
 
-  def update(deltaTime:Double) = {
+  def update(dt:Double):Unit = {
+    var deltaTime = dt
+    if (Keyboard.isKeyDown(Keyboard.KEY_P)) return
     var mouse = new Vector2(Mouse.getX, GLFrustum.screenHeight - Mouse.getY)
     var transformedMouse = mouse.transform(camera.getTransforms.inverse)
 
@@ -182,7 +282,7 @@ class GS_Game extends GameState {
       mouse.x / GLFrustum.screenWidth * gameSize.x,
       mouse.y / GLFrustum.screenHeight * gameSize.y
     )
-    camera.moveTowardsCenter(lookAt, (0.5f / deltaTime).toFloat)
+    camera.moveTowardsCenter(lookAt, (0.25f / deltaTime).toFloat)
   }
 
   def checkError() {
@@ -207,20 +307,21 @@ class GS_Game extends GameState {
     GLFrustum.modelviewMatrix = camera.getTransforms()
     glClear(GL_COLOR_BUFFER_BIT)
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE);
+    glEnable(GL_BLEND)
+    glBlendFunc(GL_ONE, GL_ONE)
 
     screenFBO.drawToTextures(List("scene")) {
       glClear(GL_COLOR_BUFFER_BIT)
       gbuf.draw()
       sparkSystem.draw()
+      boundary.draw()
     }
 
-    glDisable(GL_BLEND);
+    glDisable(GL_BLEND)
 
     if (bloomEnabled) {
       var input = screenFBO.getTexture("scene")
-      for (i <- 0 until 5) {
+      for (i <- 0 until 4) {
         blurShader.bind()
           blurShader.setUniform1f("uBlurSize", 1.0f);
           bloomFBO.drawToTextures(List("bloom_halfblur")) {

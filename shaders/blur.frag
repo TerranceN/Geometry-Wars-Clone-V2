@@ -1,4 +1,4 @@
-#version 140
+#version 130
 
 in vec2 texCoord;
 
@@ -20,11 +20,15 @@ void main() {
 
     float weights[5];
     // Gaussian blur
-    weights[0] = 70.0 / 256;
-    weights[1] = 56.0 / 256;
-    weights[2] = 28.0 / 256;
-    weights[3] =  8.0 / 256;
-    weights[4] =  1.0 / 256;
+    //weights[0] = 70.0 / 256;
+    //weights[1] = 56.0 / 256;
+    //weights[2] = 28.0 / 256;
+    //weights[3] =  8.0 / 256;
+    //weights[4] =  1.0 / 256;
+
+    weights[0] = 6.0 / 15;
+    weights[1] = 4.0 / 15;
+    weights[2] = 1.0 / 15;
 
     // Box blur
     //weights[0] = 1.0 / 9;
@@ -35,12 +39,9 @@ void main() {
 
     vec2 imageSize = textureSize(uSampler, 0);
 
-    vec2 direction = vec2(0, 1);
-    float linearBlurSize = uBlurSize / imageSize.y;
-    if (horizontal > 0.5) {
-        direction = vec2(1, 0);
-        linearBlurSize = uBlurSize / imageSize.x;
-    }
+    vec2 direction = horizontal*vec2(1, 0) + (1-horizontal)*vec2(0, 1);
+    float size = horizontal*imageSize.x + (1-horizontal)*imageSize.y;
+    float linearBlurSize = uBlurSize / size;
 
     vec4 final_color = vec4(0);
 

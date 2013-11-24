@@ -12,7 +12,7 @@ import scala.collection.mutable.Queue
 
 object Game extends App {
   Console.println(System.getProperty("java.library.path"))
-  val updateFPSCap = 60
+  val updateFPSCap = 100
   val drawFPSCap = 60
   var gameStates = new Stack[GameState]
   gameStates.push(new GS_Init)
