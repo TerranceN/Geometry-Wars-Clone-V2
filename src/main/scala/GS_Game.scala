@@ -39,7 +39,8 @@ class GS_Game extends GameState {
       //"movementY" -> new KeyboardAxis(Keyboard.KEY_W, Keyboard.KEY_S),
       //"movementX" -> new KeyboardAxis(Keyboard.KEY_A, Keyboard.KEY_D),
       "aimingY" -> new ControllerAxis(0, 2),
-      "aimingX" -> new ControllerAxis(0, 3)
+      "aimingX" -> new ControllerAxis(0, 3),
+      "specials" -> new ControllerAxis(0, 4)
     )
   )
   var player = new Player(gameSize / 2, input)

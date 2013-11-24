@@ -48,13 +48,19 @@ class SparkParticleSystem(pageSize:Int, numPages:Int) extends ParticleSystem(pag
   )
 
   def updatePage(page:Int, position:Vector2) { updatePage(page, position, new Vector2(2)) }
-  def updatePage(page:Int, position:Vector2, velocity:Vector2) {
+  def updatePage(page:Int, position:Vector2, velocity:Vector2) { updatePage(page, position, velocity, 0, pageSize, true) }
+  def updatePage(page:Int, position:Vector2, velocity:Vector2, start:Int, end:Int, isRandom:Boolean) {
     fbo.drawToTextures(List("positions", "velocities")) {
       setShader.bind()
         setShader.setUniform2f("uPosition", position.x, position.y)
         setShader.setUniform2f("uVelocity", velocity.x, velocity.y)
-        setShader.setUniform2f("uRandomSeed", random.nextFloat(), random.nextFloat())
-          fbo.drawFBOQuad(new Vector2(0, page), new Vector2(pageSize, page + 1))
+        if (isRandom) {
+          setShader.setUniform2f("uRandomSeed", random.nextFloat(), random.nextFloat())
+          setShader.setUniform1f("uIsRandom", 1.0f)
+        } else {
+          setShader.setUniform1f("uIsRandom", 0.0f)
+        }
+        fbo.drawFBOQuad(new Vector2(start, page), new Vector2(end, page + 1))
       setShader.unbind()
     }
   }

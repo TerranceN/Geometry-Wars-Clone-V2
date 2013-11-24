@@ -3,6 +3,7 @@ package com.awesome
 import org.lwjgl.input._
 
 import scala.math._
+import scala.util.Random
 
 import vectors._
 import matricies._
@@ -12,12 +13,30 @@ class Player(var position:Vector2, val input:Input) {
   val color = new Vector3(1, 1, 1)
   var angle = 0f
 
-  var lastFiringTime:Long = 0
+  var lastFiringTime:Long = System.currentTimeMillis
   var firingDelay = 100
 
+  var lastSparkTime:Long = System.currentTimeMillis
+  var sparkDelay = 10
+  var sparkPages:List[Int] = null
+  var numSparksAllocated = 500
+  var sparkIndex:Int = 0
+  var random = new Random()
+
   def readyToFire:Boolean = {
-    if (System.currentTimeMillis - lastFiringTime > firingDelay) {
-      lastFiringTime = System.currentTimeMillis
+    val timeDiff = System.currentTimeMillis - lastFiringTime
+    if (timeDiff > firingDelay) {
+      lastFiringTime = System.currentTimeMillis + (timeDiff - firingDelay)
+      return true
+    } else {
+      return false
+    }
+  }
+
+  def readyToFireExhaust:Boolean = {
+    val timeDiff = System.currentTimeMillis - lastSparkTime
+    if (timeDiff > sparkDelay) {
+      lastSparkTime = System.currentTimeMillis + (timeDiff - sparkDelay)
       return true
     } else {
       return false
@@ -25,6 +44,21 @@ class Player(var position:Vector2, val input:Input) {
   }
 
   def update(gamestate:GS_Game, deltaTime:Double) {
+    if (sparkPages == null) {
+      sparkPages = gamestate.sparkSystem.allocate(numSparksAllocated)
+    }
+    if (readyToFireExhaust) {
+      for (i <- 0 until 14) {
+        val pageIndex = sparkIndex / gamestate.sparkSystem.pageSize
+        val sparkModPageSize = sparkIndex % gamestate.sparkSystem.pageSize
+        var angle = atan2(-velocity.y, -velocity.x).toFloat
+        val variance = 1
+        angle += -(variance.toFloat / 2) + random.nextFloat() * variance
+        val newVel = new Vector2(cos(angle).toFloat, sin(angle).toFloat) * velocity.length * random.nextFloat()
+        gamestate.sparkSystem.updatePage(sparkPages(pageIndex), position, newVel, sparkModPageSize, sparkModPageSize + 1, false)
+        sparkIndex = (sparkIndex + 1) % numSparksAllocated
+      }
+    }
     def fireBullets(angle:Double) {
       var middle = position
       var angles = List(-1, 0, 1)
@@ -34,10 +68,15 @@ class Player(var position:Vector2, val input:Input) {
       }
     }
 
+    var boost = 1.0f
+    if (input.getAxis("specials") > 0.25) {
+      boost = 2.0f * input.getAxis("specials")
+    }
+
     var mouse = new Vector2(Mouse.getX, GLFrustum.screenHeight - Mouse.getY)
     var transformedMouse = mouse.transform(gamestate.camera.getTransforms.inverse)
     val rightStick = new Vector2(input.getAxis("aimingX"), input.getAxis("aimingY"))
-    if (readyToFire) {
+    if (readyToFire && boost <= 1) {
       if (rightStick.length > 0.4) {
         fireBullets(atan2(rightStick.y, rightStick.x))
       }
@@ -53,7 +92,7 @@ class Player(var position:Vector2, val input:Input) {
     val stick = new Vector2(input.getAxis("movementX"), input.getAxis("movementY"))
     var acceleration = new Vector2(0, 0)
     if (stick.length > 0.5) {
-      acceleration = stick.normalized * stick.length * 2000
+      acceleration = stick.normalized * stick.length * 2000 * boost
     }
 
     val oldPosition = position.copy
