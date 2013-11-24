@@ -26,7 +26,7 @@ class Player(var position:Vector2, val input:Input) {
   def readyToFire:Boolean = {
     val timeDiff = System.currentTimeMillis - lastFiringTime
     if (timeDiff > firingDelay) {
-      lastFiringTime = System.currentTimeMillis + (timeDiff - firingDelay)
+      lastFiringTime = System.currentTimeMillis
       return true
     } else {
       return false
@@ -36,7 +36,7 @@ class Player(var position:Vector2, val input:Input) {
   def readyToFireExhaust:Boolean = {
     val timeDiff = System.currentTimeMillis - lastSparkTime
     if (timeDiff > sparkDelay) {
-      lastSparkTime = System.currentTimeMillis + (timeDiff - sparkDelay)
+      lastSparkTime = System.currentTimeMillis
       return true
     } else {
       return false

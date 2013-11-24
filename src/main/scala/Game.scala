@@ -52,8 +52,6 @@ object Game extends App {
         while (!exit) {
           var startTime:Long = 0
           gameStates.synchronized {
-            exit = Display.isCloseRequested && !gameStates.isEmpty
-
             startTime = System.nanoTime
             val currentState = gameStates.head
             // update the current state
@@ -79,6 +77,8 @@ object Game extends App {
               gameStates.push(currentState.takeNextState)
               gameStates.head.init
             }
+
+            exit = Display.isCloseRequested || gameStates.isEmpty
           } // nothing else depends on shared data, so exit the synchronized section
 
           // calculate the time taken and delay the game if enabled

@@ -32,6 +32,8 @@ class GS_Game extends GameState {
 
   var input = new Input(
     Map(
+      "pause" -> new CombinationButton(new ControllerButton(0, 7), new KeyboardButton(Keyboard.KEY_ESCAPE)),
+      "pauseGame" -> new CombinationButton(new ControllerButton(0, 0), new KeyboardButton(Keyboard.KEY_P))
     ),
     Map(
       "movementY" -> new CombinationAxis(new ControllerAxis(0, 0), new KeyboardAxis(Keyboard.KEY_W, Keyboard.KEY_S)),
@@ -83,6 +85,15 @@ class GS_Game extends GameState {
     bloomFBO = new Framebuffer(screenFBO.fboWidth, screenFBO.fboHeight)
     bloomFBO.newTexture("bloom", GL_RGBA, null)
     bloomFBO.newTexture("bloom_halfblur", GL_RGBA, null)
+
+    controller = Controllers.getController(0)
+
+    for (i <- 0 until controller.getAxisCount()) {
+      Console.println(i + ": " + controller.getAxisName(i))
+    }
+    for (i <- 0 until controller.getButtonCount()) {
+      Console.println(i + ": " + controller.getButtonName(i))
+    }
   }
 
   def addBullet(b:Bullet) {
@@ -104,35 +115,43 @@ class GS_Game extends GameState {
       bloomEnabled = !bloomEnabled
     }
 
-    if (!Keyboard.isKeyDown(Keyboard.KEY_P)) {
-      player.update(this, deltaTime)
+    input.getButton("pause") match {
+      case ButtonState.Pressed => killState
+      case _ => {}
+    }
 
-      for (b <- bulletList) {
-        b.update(this, deltaTime)
+    input.getButton("pauseGame") match {
+      case ButtonState.Pressed => {}
+      case ButtonState.Released => {
+        player.update(this, deltaTime)
+
+        for (b <- bulletList) {
+          b.update(this, deltaTime)
+        }
+
+        gbuf.accelerationPass {
+          glEnable(GL_BLEND)
+          glBlendFunc(GL_ONE, GL_ONE)
+          accelerationShader.bind()
+            glActiveTexture(GL_TEXTURE0)
+            pushTexture.bind()
+            accelerationShader.setUniform1i("uPushSampler", 0)
+
+            bulletList.zipWithIndex.foreach{ case (b, i) =>
+              val aheadPos = b.position + b.velocity * 0.08f
+              drawPush(aheadPos, b.pushStrength, 50f)
+            }
+            drawPush(player.position, player.velocity.length / 400, 15f + player.velocity.length / 25)
+          accelerationShader.unbind()
+          glDisable(GL_BLEND)
+        }
+
+        gbuf.update(deltaTime)
+
+        sparkSystem.update(deltaTime, gameSize)
+
+        bulletList = bulletList filter (_.isAlive)
       }
-
-      gbuf.accelerationPass {
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_ONE, GL_ONE)
-        accelerationShader.bind()
-          glActiveTexture(GL_TEXTURE0)
-          pushTexture.bind()
-          accelerationShader.setUniform1i("uPushSampler", 0)
-
-          bulletList.zipWithIndex.foreach{ case (b, i) =>
-            val aheadPos = b.position + b.velocity * 0.08f
-            drawPush(aheadPos, b.pushStrength, 50f)
-          }
-          drawPush(player.position, player.velocity.length / 400, 15f + player.velocity.length / 25)
-        accelerationShader.unbind()
-        glDisable(GL_BLEND)
-      }
-
-      gbuf.update(deltaTime)
-
-      sparkSystem.update(deltaTime, gameSize)
-
-      bulletList = bulletList filter (_.isAlive)
     }
 
     wasKeyBDown = Keyboard.isKeyDown(Keyboard.KEY_B)

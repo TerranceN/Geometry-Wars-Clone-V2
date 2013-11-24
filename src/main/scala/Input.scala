@@ -44,6 +44,15 @@ class ControllerButton(val controllerIndex:Int, val button:Int) extends InputBut
   }
 }
 
+class CombinationButton(val button1:InputButton, val button2:InputButton) extends InputButton {
+  def getButton():ButtonState = {
+    return button1.getButton match {
+      case Pressed => Pressed
+      case Released => button2.getButton
+    }
+  }
+}
+
 trait InputAxis {
   var enabled:Boolean = false
   val initialValue = getAxisValue()
