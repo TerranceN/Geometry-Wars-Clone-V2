@@ -45,11 +45,29 @@ class ControllerButton(val controllerIndex:Int, val button:Int) extends InputBut
 }
 
 trait InputAxis {
-  def getAxis():Float
+  var enabled:Boolean = false
+  val initialValue = getAxisValue()
+
+  def checkInitialValue(value:Float):Float = {
+    if (value != initialValue) {
+      enabled = true
+      return value
+    } else {
+      return 0
+    }
+  }
+  def getAxis():Float = {
+    if (enabled) {
+      return getAxisValue()
+    } else {
+      return checkInitialValue(getAxisValue())
+    }
+  }
+  def getAxisValue():Float
 }
 
 class KeyboardAxis(lowKey:Int, highKey:Int) extends InputAxis {
-  def getAxis():Float = {
+  def getAxisValue():Float = {
     var total = 0.0f
     if (Keyboard.isKeyDown(lowKey)) {
       total -= 1
@@ -62,7 +80,7 @@ class KeyboardAxis(lowKey:Int, highKey:Int) extends InputAxis {
 }
 
 class ControllerAxis(val controllerIndex:Int, val axis:Int) extends InputAxis {
-  def getAxis():Float = {
+  def getAxisValue():Float = {
     return (Controllers.getController(controllerIndex).getAxisValue(axis))
   }
 }
@@ -72,44 +90,16 @@ class CombinationAxis(val axis1:InputAxis, val axis2:InputAxis) extends InputAxi
     return max(lower, min(upper, x)).toFloat
   }
 
-  def getAxis():Float = {
-    return clamp(axis1.getAxis() + axis2.getAxis(), -1, 1)
+  def getAxisValue():Float = {
+    return clamp(axis1.getAxisValue() + axis2.getAxisValue(), -1, 1)
   }
 }
 
 class Input(var buttonDict:Map[String, InputButton], var axisDict:Map[String, InputAxis]) {
   import ButtonState._
 
-  var initialButtonValues:Map[String, ButtonState] = Map()
-  for ((k, v) <- buttonDict) {
-    initialButtonValues += k -> v.getButton()
-  }
-
-  var initialAxisValues:Map[String, Float] = Map()
-  for ((k, v) <- axisDict) {
-    initialAxisValues += k -> v.getAxis()
-  }
-
-  var controllerEnabled:Map[Int, Boolean] = Map()
-
   def getAxis(name:String):Float = {
-    axisDict(name) match {
-      case axis:ControllerAxis => {
-        val value = axis.getAxis()
-        if (!(controllerEnabled contains axis.controllerIndex)) {
-          if (value != initialAxisValues(name)) {
-            controllerEnabled += axis.controllerIndex -> true
-            return value
-          } else {
-            return 0.0f
-          }
-        } else {
-          return value
-        }
-      }
-      case other:InputAxis => other.getAxis()
-    }
-    return axisDict(name).getAxis()
+    axisDict(name).getAxis()
   }
 
   def getButton(name:String):ButtonState = {
