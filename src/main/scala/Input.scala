@@ -91,7 +91,7 @@ class CombinationAxis(val axis1:InputAxis, val axis2:InputAxis) extends InputAxi
   }
 
   def getAxisValue():Float = {
-    return clamp(axis1.getAxisValue() + axis2.getAxisValue(), -1, 1)
+    return clamp(axis1.getAxis() + axis2.getAxis(), -1, 1)
   }
 }
 
