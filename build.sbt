@@ -15,7 +15,10 @@ retrieveManaged := true
 jarsToExtract ++= Seq(
     "lib_managed/jars/org.lwjgl.lwjgl/lwjgl-platform/lwjgl-platform-2.9.0-natives-linux.jar",
     "lib_managed/jars/org.lwjgl.lwjgl/lwjgl-platform/lwjgl-platform-2.9.0-natives-osx.jar",
-    "lib_managed/jars/org.lwjgl.lwjgl/lwjgl-platform/lwjgl-platform-2.9.0-natives-windows.jar"
+    "lib_managed/jars/org.lwjgl.lwjgl/lwjgl-platform/lwjgl-platform-2.9.0-natives-windows.jar",
+    "lib_managed/jars/net.java.jinput/jinput-platform/jinput-platform-2.0.5-natives-linux.jar",
+    "lib_managed/jars/net.java.jinput/jinput-platform/jinput-platform-2.0.5-natives-osx.jar",
+    "lib_managed/jars/net.java.jinput/jinput-platform/jinput-platform-2.0.5-natives-windows.jar"
 )
 
 fork := true
@@ -26,5 +29,6 @@ libraryDependencies ++= Seq(
   "org.scala-lang" % "scala-reflect" % "2.10.1",
   "org.lwjgl.lwjgl" % "lwjgl" % "2.9.0",
   "org.lwjgl.lwjgl" % "lwjgl_util" % "2.9.0",
-  "org.lwjgl.lwjgl" % "lwjgl-platform" % "2.9.0" classifier "natives-windows" classifier "natives-linux" classifier "natives-osx"
+  "org.lwjgl.lwjgl" % "lwjgl-platform" % "2.9.0" classifier "natives-windows" classifier "natives-linux" classifier "natives-osx",
+  "net.java.jinput" % "jinput-platform" % "2.0.5"
 )

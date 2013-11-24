@@ -3,52 +3,45 @@ package com.awesome.textures
 import org.lwjgl.opengl.GL11._
 import org.lwjgl.opengl.GL12._
 import org.lwjgl.opengl.GL13._
+import org.lwjgl.opengl.GL15._
+import org.lwjgl.opengl.GL20._
 import org.lwjgl.opengl.GL21._
 import org.lwjgl.opengl.GL30._
 import org.lwjgl.opengl.EXTTextureCompressionS3TC._
 import org.lwjgl.opengl.EXTTextureSRGB._
 import org.lwjgl.BufferUtils
 
-import java.io.File
-import java.io.IOException
-import java.awt.image._
-import javax.imageio.ImageIO
+import de.matthiasmann.twl.utils.PNGDecoder;
 
-class Texture(image:BufferedImage, deGamma:Boolean) {
-  def this(image:BufferedImage) = this(image, false)
+import com.awesome.GLFrustum
+import com.awesome.shaders._
 
+import java.io._
+
+class Texture(fileName:String) {
   glEnable(GL_TEXTURE_2D)
 
   val id = glGenTextures
   glActiveTexture(GL_TEXTURE0)
   glBindTexture(GL_TEXTURE_2D, id)
 
-  val numComponents = image.getColorModel.getNumComponents
+  val internalType = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT
 
-  val inputType:Int = numComponents match {
-    case 4 => GL_BGRA
-    case 3 => GL_BGR
-    case 2 => GL_RG
-    case 1 => GL_RED
-    case _ => -1
+  var in:InputStream = new FileInputStream(fileName)
+  try {
+    var decoder = new PNGDecoder(in)
+
+    val buf = BufferUtils.createByteBuffer(4 * decoder.getWidth * decoder.getHeight)
+    decoder.decode(buf, decoder.getWidth * 4, PNGDecoder.Format.RGBA)
+    buf.flip
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, decoder.getWidth, decoder.getHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, buf)
+
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR); // Linear Filtering
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR); // Linear Filtering
+  } finally {
   }
-
-  val internalType = deGamma match {
-    case true => GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT
-    case false => GL_COMPRESSED_RGBA_S3TC_DXT5_EXT
-  }
-
-  val pixels = (image.getRaster.getDataBuffer).asInstanceOf[DataBufferByte].getData
-  Console.println("inputType: " + inputType + ", pixel bytes: " + pixels.length)
-  val buf = BufferUtils.createByteBuffer(pixels.length)
-  buf.put(pixels)
-  buf.flip
-
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
-  glTexImage2D(GL_TEXTURE_2D, 0, internalType, image.getWidth, image.getHeight, 0, inputType, GL_UNSIGNED_BYTE, buf)
-
-  glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR); // Linear Filtering
-  glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR); // Linear Filtering
 
   glDisable(GL_TEXTURE_2D)
 
@@ -61,26 +54,47 @@ class Texture(image:BufferedImage, deGamma:Boolean) {
     glDisable(GL_TEXTURE_2D)
   }
 }
-
 object Texture {
-  def fromImage(fileName:String):Texture = fromImage(fileName, false)
-  def fromImage(fileName:String, deGamma:Boolean):Texture = {
-    Console.println("Loading texture: " + fileName)
-    Console.println("deGamma: " + deGamma)
-    try {
-      val image = ImageIO.read(new File(fileName))
-      Console.println("image size: " + image.getWidth + ", " + image.getHeight)
-      return new Texture(image, deGamma)
-    } catch {
-      case e:IllegalArgumentException => {
-        Console.println("Warning: null passed to Texture.fromImage")
-        e.printStackTrace
-      }
-      case e:Exception => {
-        Console.println("Error: Failed to load texture: " + fileName)
-      }
-    }
+  val vbo = glGenBuffers()
+  initVBO()
 
-    return null
+  def initVBO() {
+    val buffer = BufferUtils.createFloatBuffer(16)
+    buffer.put(0); buffer.put(0)
+    buffer.put(0); buffer.put(0)
+
+    buffer.put(1); buffer.put(0)
+    buffer.put(1); buffer.put(0)
+
+    buffer.put(1); buffer.put(1)
+    buffer.put(1); buffer.put(1)
+
+    buffer.put(0); buffer.put(1)
+    buffer.put(0); buffer.put(1)
+
+    buffer.flip()
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo)
+    glBufferData(GL_ARRAY_BUFFER, buffer, GL_STATIC_DRAW)
+  }
+
+  def drawUnitQuad() {
+    GLFrustum.setMatricies()
+    val program = ShaderProgram.getActiveShader()
+
+    val aCoordLocation = glGetAttribLocation(program.id, "aCoord")
+    val aTexCoordLocation = glGetAttribLocation(program.id, "aTexCoord")
+
+    glEnableVertexAttribArray(aCoordLocation)
+    glEnableVertexAttribArray(aTexCoordLocation)
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo)
+    glVertexAttribPointer(aCoordLocation, 2, GL_FLOAT, false, 4 * 4, 0)
+    glVertexAttribPointer(aTexCoordLocation, 2, GL_FLOAT, false, 4 * 4, 2 * 4)
+
+    glDrawArrays(GL_QUADS, 0, 4)
+
+    glDisableVertexAttribArray(aCoordLocation)
+    glDisableVertexAttribArray(aTexCoordLocation)
   }
 }

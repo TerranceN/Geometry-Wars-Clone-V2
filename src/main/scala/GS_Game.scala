@@ -18,14 +18,12 @@ import org.lwjgl.util.glu.GLU._
 
 import textures._
 import shaders._
-import models._
 import vectors._
-import lighting._
 import matricies._
 
 class GS_Game extends GameState {
   val sparkSystem = new SparkParticleSystem(250, 50)
-  var gameSize = new Vector2(1500, 1500)
+  var gameSize = new Vector2(2000, 2000)
   //class SparkEmitter(val center:Vector2, val radius:Float, val maxLife:Float) {
   //  def update(deltaTime:Double) {
   //  }
@@ -33,11 +31,12 @@ class GS_Game extends GameState {
   //  def draw() {
   //  }
   //}
-  class Bullet(var position:Vector2, var velocity:Vector2) {
+  class Bullet(var position:Vector2, var velocity:Vector2, val angle:Float) {
     var timeAlive:Float = 0
     var pushStrength:Float = 0
     var isAlive = true
     val timeToMax = 0.25f
+    val color = new Vector3(1, 1, 0)
     def update(deltaTime:Double) {
       if (isAlive) {
         if (timeAlive < timeToMax) {
@@ -45,7 +44,7 @@ class GS_Game extends GameState {
         } else {
           pushStrength = 1
         }
-        pushStrength = pushStrength * (velocity.length / 600) * 0.55f
+        pushStrength = pushStrength * (velocity.length / 800) * 1f
         timeAlive += deltaTime.toFloat
         position += velocity * deltaTime.toFloat
 
@@ -57,6 +56,24 @@ class GS_Game extends GameState {
         }
       }
     }
+    def draw() {
+      GLFrustum.pushModelview()
+        GLFrustum.modelviewMatrix.multiplyBy(Matrix4.translate(position) * Matrix4.scale(5, 5, 1) * Matrix4.rotateZ(angle))
+        Player.model.draw(color)
+      GLFrustum.popModelview()
+    }
+  }
+  object Bullet {
+    val model = new LineModel(List(
+      new Vector2(1, 0),
+      new Vector2(-1, 0.25f),
+
+      new Vector2(-1, 0.25f),
+      new Vector2(-1, -0.25f),
+
+      new Vector2(-1, -0.25f),
+      new Vector2(1, 0)
+    ))
   }
   var camera = new Camera()
   class Boundary(val padding:Float) {
@@ -164,11 +181,20 @@ class GS_Game extends GameState {
   var screenFBO:Framebuffer = null
   var bloomFBO:Framebuffer = null
 
+  var lastFiringTime:Long = 0
+  var firingDelay = 100
+
   var wasMouse0Down = false
   var wasMouse1Down = false
   var wasKeyBDown = false
 
+  var player = new Player(gameSize / 2)
+
+  var pushTexture = new Texture("assets/push.png")
+
   var bloomEnabled = true
+
+  var controller:Controller = null;
 
   val accelerationShader = new ShaderProgram(
     new VertexShader("shaders/test.vert"),
@@ -192,8 +218,6 @@ class GS_Game extends GameState {
 
   var boundary = new Boundary(20)
 
-  var angle:Double = 0
-
   var bulletList:List[Bullet] = Nil
 
 
@@ -201,7 +225,7 @@ class GS_Game extends GameState {
   //gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 241, 141)
   //gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 121, 71)
   //gbuf.setup(2560, 2560, 481, 481)
-  gbuf.setup(gameSize.x.toInt, gameSize.y.toInt, 121, 121)
+  gbuf.setup(gameSize.x.toInt, gameSize.y.toInt, 161, 161)
 
   def init() = {
     screenFBO = new Framebuffer(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt)
@@ -210,69 +234,110 @@ class GS_Game extends GameState {
     bloomFBO = new Framebuffer(screenFBO.fboWidth, screenFBO.fboHeight)
     bloomFBO.newTexture("bloom", GL_RGBA, null)
     bloomFBO.newTexture("bloom_halfblur", GL_RGBA, null)
+
+    try {
+      Controllers.create()
+    } catch {
+      case e:Exception => {}
+    }
+
+    Controllers.poll()
+
+    controller = Controllers.getController(0)
+
+    for (i <- 0 until controller.getAxisCount()) {
+      Console.println(controller.getAxisName(i))
+    }
+    for (i <- 0 until controller.getButtonCount()) {
+      Console.println(controller.getButtonName(i))
+    }
   }
 
   def update(dt:Double):Unit = {
     var deltaTime = dt
-    if (Keyboard.isKeyDown(Keyboard.KEY_P)) return
     var mouse = new Vector2(Mouse.getX, GLFrustum.screenHeight - Mouse.getY)
     var transformedMouse = mouse.transform(camera.getTransforms.inverse)
-
-    angle += 5 * deltaTime.toFloat
-
     if (!wasKeyBDown && Keyboard.isKeyDown(Keyboard.KEY_B)) {
       bloomEnabled = !bloomEnabled
     }
 
-    if (!wasMouse0Down && Mouse.isButtonDown(0)) {
-      var middle = gameSize * 0.5f
-      var mouse = transformedMouse
-      var diff = mouse - middle
-      var angle = atan2(diff.y, diff.x)
+    def fireBullets(angle:Double) {
+      var middle = player.position
       var angles = List(-1, 0, 1)
       for (i <- angles) {
         var newAngle = angle + Pi / 90 * 2 * i
-        bulletList = new Bullet(middle, new Vector2(cos(newAngle).toFloat, sin(newAngle).toFloat) * 1000) :: bulletList
+        bulletList = new Bullet(middle, new Vector2(cos(newAngle).toFloat, sin(newAngle).toFloat) * 750, newAngle.toFloat) :: bulletList
       }
     }
 
-    if ((!wasMouse1Down && Mouse.isButtonDown(1)) || Mouse.isButtonDown(2)) {
-      var pages = sparkSystem.allocate(sparkSystem.pageSize)
-      pages map (x => sparkSystem.updatePage(x, transformedMouse))
-      sparkSystem.deallocate(pages)
+    def readyToFire:Boolean = {
+      if (System.currentTimeMillis - lastFiringTime > firingDelay) {
+        lastFiringTime = System.currentTimeMillis
+        return true
+      } else {
+        return false
+      }
     }
 
-    for (b <- bulletList) {
-      b.update(deltaTime)
+    def drawPush(position:Vector2, strength:Float, size:Float) {
+      GLFrustum.pushModelview()
+        var drawPos = position - new Vector2(size)
+        accelerationShader.setUniform1f("uPushStrength", strength)
+        GLFrustum.modelviewMatrix = Matrix4.translate(drawPos) * Matrix4.scale(size * 2, size * 2, 1)
+        Texture.drawUnitQuad()
+      GLFrustum.popModelview()
     }
 
-    gbuf.accelerationPass {
-      accelerationShader.bind()
-        bulletList.zipWithIndex.foreach{ case (b, i) =>
-          accelerationShader.setUniform2f("uPushPositions[" + (i) + "]", b.position.x, b.position.y)
-          accelerationShader.setUniform2f("uPushVelocity[" + (i) + "]", b.velocity.x, b.velocity.y)
-          accelerationShader.setUniform1f("uPushStrength[" + (i) + "]", b.pushStrength)
-          accelerationShader.setUniform1f("uPushSize[" + (i) + "]", 50f)
+    if (!Keyboard.isKeyDown(Keyboard.KEY_P)) {
+      val rightStick = new Vector2(controller.getRXAxisValue, controller.getRYAxisValue)
+      if (readyToFire) {
+        if (rightStick.length > 0.4) {
+          fireBullets(atan2(rightStick.y, rightStick.x))
         }
-        accelerationShader.setUniform2f("uPushPositions[" + bulletList.size + "]", transformedMouse.x, transformedMouse.y)
-        //accelerationShader.setUniform2f("uPushPositions[" + bulletList.size + "]", Mouse.getX, Mouse.getY)
-        accelerationShader.setUniform2f("uPushVelocity[" + bulletList.size + "]", 0, 0)
-        accelerationShader.setUniform1f(
-          "uPushStrength[" + bulletList.size + "]",
-          -(new Vector2(Mouse.getDX(), Mouse.getDY()).length / 5) / (deltaTime.toFloat * 300)
-        )
-        accelerationShader.setUniform1f("uPushSize[" + bulletList.size + "]", 350f)
-        accelerationShader.setUniform1i("uNumPositions", bulletList.size + 1);
-        accelerationShader.setUniform2f("uScreenSize", GLFrustum.screenWidth, GLFrustum.screenHeight)
-        gbuf.accelerationFBO.drawFBOQuad()
-      accelerationShader.unbind()
+
+        if (!wasMouse0Down && Mouse.isButtonDown(0)) {
+          var middle = player.position
+          var mouse = transformedMouse
+          var diff = mouse - middle
+          fireBullets(atan2(diff.y, diff.x))
+        }
+      }
+
+      player.update(controller, deltaTime)
+
+      if ((!wasMouse1Down && Mouse.isButtonDown(1)) || Mouse.isButtonDown(2)) {
+        var pages = sparkSystem.allocate(sparkSystem.pageSize)
+        pages map (x => sparkSystem.updatePage(x, transformedMouse))
+        sparkSystem.deallocate(pages)
+      }
+
+      for (b <- bulletList) {
+        b.update(deltaTime)
+      }
+
+      gbuf.accelerationPass {
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_ONE, GL_ONE)
+        accelerationShader.bind()
+          glActiveTexture(GL_TEXTURE0)
+          pushTexture.bind()
+          accelerationShader.setUniform1i("uPushSampler", 0)
+
+          bulletList.zipWithIndex.foreach{ case (b, i) =>
+            val aheadPos = b.position + b.velocity * 0.08f
+            drawPush(aheadPos, b.pushStrength, 50f)
+          }
+          drawPush(transformedMouse, -(new Vector2(Mouse.getDX(), Mouse.getDY()).length / 5) / (deltaTime.toFloat * 300), 350f)
+        accelerationShader.unbind()
+        glDisable(GL_BLEND)
+      }
+
+      gbuf.update(deltaTime)
+
+      sparkSystem.update(deltaTime, gameSize)
+
+      bulletList = bulletList filter (_.isAlive)
     }
-
-    gbuf.update(deltaTime)
-
-    sparkSystem.update(deltaTime, gameSize)
-
-    bulletList = bulletList filter (_.isAlive)
 
     wasMouse0Down = Mouse.isButtonDown(0)
     wasMouse1Down = Mouse.isButtonDown(1)
@@ -282,6 +347,7 @@ class GS_Game extends GameState {
       mouse.x / GLFrustum.screenWidth * gameSize.x,
       mouse.y / GLFrustum.screenHeight * gameSize.y
     )
+    lookAt = player.position
     camera.moveTowardsCenter(lookAt, (0.25f / deltaTime).toFloat)
   }
 
@@ -313,6 +379,8 @@ class GS_Game extends GameState {
     screenFBO.drawToTextures(List("scene")) {
       glClear(GL_COLOR_BUFFER_BIT)
       gbuf.draw()
+      player.draw()
+      bulletList map (_.draw())
       sparkSystem.draw()
       boundary.draw()
     }
@@ -368,7 +436,6 @@ class GS_Game extends GameState {
       //gbuf.accelerationFBO.drawFBOQuad()
       //sparkSystem.fbo.drawFBOQuad()
     mainSceneShader.unbind()
-
 
     checkError
   }

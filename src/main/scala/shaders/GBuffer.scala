@@ -176,10 +176,13 @@ class GBuffer {
 
   def accelerationPass(f: => Unit) {
     accelerationFBO.drawToTextures(List("accelerations")) {
-      glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
-      glClear(GL_COLOR_BUFFER_BIT)
+      GLFrustum.pushProjection()
+        GLFrustum.projectionMatrix = Matrix4.ortho(0, screenWidth, screenHeight, 0, -1, 1)
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
+        glClear(GL_COLOR_BUFFER_BIT)
 
-      f
+        f
+      GLFrustum.popProjection()
     }
   }
 
