@@ -1,6 +1,7 @@
 package com.awesome
 
 import org.lwjgl.input._
+import scala.math._
 
 object ButtonState extends Enumeration {
   type ButtonState = Value
@@ -63,6 +64,16 @@ class KeyboardAxis(lowKey:Int, highKey:Int) extends InputAxis {
 class ControllerAxis(val controllerIndex:Int, val axis:Int) extends InputAxis {
   def getAxis():Float = {
     return (Controllers.getController(controllerIndex).getAxisValue(axis))
+  }
+}
+
+class CombinationAxis(val axis1:InputAxis, val axis2:InputAxis) extends InputAxis {
+  def clamp(x:Float, lower:Float, upper:Float):Float = {
+    return max(lower, min(upper, x)).toFloat
+  }
+
+  def getAxis():Float = {
+    return clamp(axis1.getAxis() + axis2.getAxis(), -1, 1)
   }
 }
 

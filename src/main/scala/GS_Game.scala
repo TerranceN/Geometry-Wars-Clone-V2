@@ -34,10 +34,8 @@ class GS_Game extends GameState {
     Map(
     ),
     Map(
-      "movementY" -> new ControllerAxis(0, 0),
-      "movementX" -> new ControllerAxis(0, 1),
-      //"movementY" -> new KeyboardAxis(Keyboard.KEY_W, Keyboard.KEY_S),
-      //"movementX" -> new KeyboardAxis(Keyboard.KEY_A, Keyboard.KEY_D),
+      "movementY" -> new CombinationAxis(new ControllerAxis(0, 0), new KeyboardAxis(Keyboard.KEY_W, Keyboard.KEY_S)),
+      "movementX" -> new CombinationAxis(new ControllerAxis(0, 1), new KeyboardAxis(Keyboard.KEY_A, Keyboard.KEY_D)),
       "aimingY" -> new ControllerAxis(0, 2),
       "aimingX" -> new ControllerAxis(0, 3),
       "specials" -> new ControllerAxis(0, 4)
@@ -125,6 +123,7 @@ class GS_Game extends GameState {
             val aheadPos = b.position + b.velocity * 0.08f
             drawPush(aheadPos, b.pushStrength, 50f)
           }
+          drawPush(player.position, player.velocity.length / 400, 15f + player.velocity.length / 25)
         accelerationShader.unbind()
         glDisable(GL_BLEND)
       }

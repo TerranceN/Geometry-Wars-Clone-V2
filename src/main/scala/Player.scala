@@ -92,7 +92,7 @@ class Player(var position:Vector2, val input:Input) {
     val stick = new Vector2(input.getAxis("movementX"), input.getAxis("movementY"))
     var acceleration = new Vector2(0, 0)
     if (stick.length > 0.5) {
-      acceleration = stick.normalized * stick.length * 2000 * boost
+      acceleration = stick.normalized * min(stick.length, 1).toFloat * 2000 * boost
     }
 
     val oldPosition = position.copy
