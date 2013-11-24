@@ -12,7 +12,6 @@ import org.lwjgl.opengl.{
 }
 import org.lwjgl.BufferUtils
 import org.lwjgl.input._
-import scala.util.Random
 import scala.math._
 import org.lwjgl.util.glu.GLU._
 
@@ -24,171 +23,26 @@ import matricies._
 class GS_Game extends GameState {
   val sparkSystem = new SparkParticleSystem(250, 50)
   var gameSize = new Vector2(2000, 2000)
-  //class SparkEmitter(val center:Vector2, val radius:Float, val maxLife:Float) {
-  //  def update(deltaTime:Double) {
-  //  }
-
-  //  def draw() {
-  //  }
-  //}
-  class Bullet(var position:Vector2, var velocity:Vector2, val angle:Float) {
-    var timeAlive:Float = 0
-    var pushStrength:Float = 0
-    var isAlive = true
-    val timeToMax = 0.25f
-    val color = new Vector3(1, 1, 0)
-    def update(deltaTime:Double) {
-      if (isAlive) {
-        if (timeAlive < timeToMax) {
-          pushStrength = timeAlive / timeToMax
-        } else {
-          pushStrength = 1
-        }
-        pushStrength = pushStrength * (velocity.length / 800) * 1f
-        timeAlive += deltaTime.toFloat
-        position += velocity * deltaTime.toFloat
-
-        if (position.x < 0 || position.y < 0 || position.x > gameSize.x || position.y > gameSize.y) {
-          isAlive = false
-          var pages = sparkSystem.allocate(sparkSystem.pageSize)
-          pages map (x => sparkSystem.updatePage(x, position, velocity))
-          sparkSystem.deallocate(pages)
-        }
-      }
-    }
-    def draw() {
-      GLFrustum.pushModelview()
-        GLFrustum.modelviewMatrix.multiplyBy(Matrix4.translate(position) * Matrix4.scale(5, 5, 1) * Matrix4.rotateZ(angle))
-        Player.model.draw(color)
-      GLFrustum.popModelview()
-    }
-  }
-  object Bullet {
-    val model = new LineModel(List(
-      new Vector2(1, 0),
-      new Vector2(-1, 0.25f),
-
-      new Vector2(-1, 0.25f),
-      new Vector2(-1, -0.25f),
-
-      new Vector2(-1, -0.25f),
-      new Vector2(1, 0)
-    ))
-  }
   var camera = new Camera()
-  class Boundary(val padding:Float) {
-    camera.setBoundaries(new Vector2(-padding), gameSize - new Vector2(GLFrustum.screenWidth, GLFrustum.screenHeight) + new Vector2(padding))
-
-    val primitiveShader = new ShaderProgram(
-      new VertexShader("shaders/primitiveWithColor.vert"),
-      new FragmentShader("shaders/primitiveWithColor.frag")
-    )
-
-    val borderVBO = glGenBuffers()
-    initBorderVBO()
-
-    val blackedOutAreasVBO = glGenBuffers()
-    initBlackedOutAreasVBO()
-
-    def initBorderVBO() {
-      val buffer = BufferUtils.createFloatBuffer(5 * 2)
-      buffer.put(0); buffer.put(0)
-      buffer.put(gameSize.x); buffer.put(0)
-      buffer.put(gameSize.x); buffer.put(gameSize.y)
-      buffer.put(0); buffer.put(gameSize.y)
-      buffer.put(0); buffer.put(0)
-      buffer.flip()
-
-      glBindBuffer(GL_ARRAY_BUFFER, borderVBO)
-      glBufferData(GL_ARRAY_BUFFER, buffer, GL_STATIC_DRAW)
-    }
-
-    def initBlackedOutAreasVBO() {
-      val buffer = BufferUtils.createFloatBuffer(4 * 4 * 2)
-      buffer.put(-padding); buffer.put(-padding)
-      buffer.put(0); buffer.put(0)
-      buffer.put(gameSize.x); buffer.put(0)
-      buffer.put(gameSize.x + padding); buffer.put(-padding)
-
-      buffer.put(gameSize.x + padding); buffer.put(-padding)
-      buffer.put(gameSize.x); buffer.put(0)
-      buffer.put(gameSize.x); buffer.put(gameSize.y)
-      buffer.put(gameSize.x + padding); buffer.put(gameSize.y + padding)
-
-      buffer.put(gameSize.x + padding); buffer.put(gameSize.y + padding)
-      buffer.put(gameSize.x); buffer.put(gameSize.y)
-      buffer.put(0); buffer.put(gameSize.y)
-      buffer.put(-padding); buffer.put(gameSize.y + padding)
-
-      buffer.put(-padding); buffer.put(gameSize.y + padding)
-      buffer.put(0); buffer.put(gameSize.y)
-      buffer.put(0); buffer.put(0)
-      buffer.put(-padding); buffer.put(-padding)
-
-      buffer.flip()
-
-      glBindBuffer(GL_ARRAY_BUFFER, blackedOutAreasVBO)
-      glBufferData(GL_ARRAY_BUFFER, buffer, GL_STATIC_DRAW)
-    }
-
-    def drawBorder() {
-      val program = ShaderProgram.getActiveShader()
-
-      val aCoordLocation = glGetAttribLocation(program.id, "aCoord")
-      program.setUniform4f("uColor", 1, 1, 1, 1)
-
-      glEnableVertexAttribArray(aCoordLocation)
-
-      glBindBuffer(GL_ARRAY_BUFFER, borderVBO)
-      glVertexAttribPointer(aCoordLocation, 2, GL_FLOAT, false, 2 * 4, 0)
-
-      glDrawArrays(GL_LINE_STRIP, 0, 5)
-
-      glDisableVertexAttribArray(aCoordLocation)
-    }
-
-    def drawBlackedOutAreas() {
-      val program = ShaderProgram.getActiveShader()
-
-      val aCoordLocation = glGetAttribLocation(program.id, "aCoord")
-      program.setUniform4f("uColor", 0, 0, 0, 1)
-
-      glEnableVertexAttribArray(aCoordLocation)
-
-      glBindBuffer(GL_ARRAY_BUFFER, blackedOutAreasVBO)
-      glVertexAttribPointer(aCoordLocation, 2, GL_FLOAT, false, 2 * 4, 0)
-
-      glDrawArrays(GL_QUADS, 0, 4 * 4)
-
-      glDisableVertexAttribArray(aCoordLocation)
-    }
-
-    def draw() {
-      primitiveShader.bind()
-        GLFrustum.setMatricies()
-        glDisable(GL_BLEND)
-        // black out edges
-        drawBlackedOutAreas()
-        // add white border
-        drawBorder()
-        glEnable(GL_BLEND)
-      primitiveShader.unbind()
-    }
-  }
-
-  val random = new Random
 
   var screenFBO:Framebuffer = null
   var bloomFBO:Framebuffer = null
 
-  var lastFiringTime:Long = 0
-  var firingDelay = 100
-
-  var wasMouse0Down = false
-  var wasMouse1Down = false
   var wasKeyBDown = false
 
-  var player = new Player(gameSize / 2)
+  var input = new Input(
+    Map(
+    ),
+    Map(
+      "movementY" -> new ControllerAxis(0, 0),
+      "movementX" -> new ControllerAxis(0, 1),
+      //"movementY" -> new KeyboardAxis(Keyboard.KEY_W, Keyboard.KEY_S),
+      //"movementX" -> new KeyboardAxis(Keyboard.KEY_A, Keyboard.KEY_D),
+      "aimingY" -> new ControllerAxis(0, 2),
+      "aimingX" -> new ControllerAxis(0, 3)
+    )
+  )
+  var player = new Player(gameSize / 2, input)
 
   var pushTexture = new Texture("assets/push.png")
 
@@ -216,15 +70,11 @@ class GS_Game extends GameState {
     new FragmentShader("shaders/additive.frag")
   )
 
-  var boundary = new Boundary(20)
+  var boundary = new Boundary(camera, gameSize, 20)
 
   var bulletList:List[Bullet] = Nil
 
-
   var gbuf = new GBuffer()
-  //gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 241, 141)
-  //gbuf.setup(GLFrustum.screenWidth.toInt, GLFrustum.screenHeight.toInt, 121, 71)
-  //gbuf.setup(2560, 2560, 481, 481)
   gbuf.setup(gameSize.x.toInt, gameSize.y.toInt, 161, 161)
 
   def init() = {
@@ -234,85 +84,32 @@ class GS_Game extends GameState {
     bloomFBO = new Framebuffer(screenFBO.fboWidth, screenFBO.fboHeight)
     bloomFBO.newTexture("bloom", GL_RGBA, null)
     bloomFBO.newTexture("bloom_halfblur", GL_RGBA, null)
+  }
 
-    try {
-      Controllers.create()
-    } catch {
-      case e:Exception => {}
-    }
+  def addBullet(b:Bullet) {
+    bulletList = b :: bulletList
+  }
 
-    Controllers.poll()
-
-    controller = Controllers.getController(0)
-
-    for (i <- 0 until controller.getAxisCount()) {
-      Console.println(controller.getAxisName(i))
-    }
-    for (i <- 0 until controller.getButtonCount()) {
-      Console.println(controller.getButtonName(i))
-    }
+  def drawPush(position:Vector2, strength:Float, size:Float) {
+    GLFrustum.pushModelview()
+      var drawPos = position - new Vector2(size)
+      accelerationShader.setUniform1f("uPushStrength", strength)
+      GLFrustum.modelviewMatrix = Matrix4.translate(drawPos) * Matrix4.scale(size * 2, size * 2, 1)
+      Texture.drawUnitQuad()
+    GLFrustum.popModelview()
   }
 
   def update(dt:Double):Unit = {
     var deltaTime = dt
-    var mouse = new Vector2(Mouse.getX, GLFrustum.screenHeight - Mouse.getY)
-    var transformedMouse = mouse.transform(camera.getTransforms.inverse)
     if (!wasKeyBDown && Keyboard.isKeyDown(Keyboard.KEY_B)) {
       bloomEnabled = !bloomEnabled
     }
 
-    def fireBullets(angle:Double) {
-      var middle = player.position
-      var angles = List(-1, 0, 1)
-      for (i <- angles) {
-        var newAngle = angle + Pi / 90 * 2 * i
-        bulletList = new Bullet(middle, new Vector2(cos(newAngle).toFloat, sin(newAngle).toFloat) * 750, newAngle.toFloat) :: bulletList
-      }
-    }
-
-    def readyToFire:Boolean = {
-      if (System.currentTimeMillis - lastFiringTime > firingDelay) {
-        lastFiringTime = System.currentTimeMillis
-        return true
-      } else {
-        return false
-      }
-    }
-
-    def drawPush(position:Vector2, strength:Float, size:Float) {
-      GLFrustum.pushModelview()
-        var drawPos = position - new Vector2(size)
-        accelerationShader.setUniform1f("uPushStrength", strength)
-        GLFrustum.modelviewMatrix = Matrix4.translate(drawPos) * Matrix4.scale(size * 2, size * 2, 1)
-        Texture.drawUnitQuad()
-      GLFrustum.popModelview()
-    }
-
     if (!Keyboard.isKeyDown(Keyboard.KEY_P)) {
-      val rightStick = new Vector2(controller.getRXAxisValue, controller.getRYAxisValue)
-      if (readyToFire) {
-        if (rightStick.length > 0.4) {
-          fireBullets(atan2(rightStick.y, rightStick.x))
-        }
-
-        if (!wasMouse0Down && Mouse.isButtonDown(0)) {
-          var middle = player.position
-          var mouse = transformedMouse
-          var diff = mouse - middle
-          fireBullets(atan2(diff.y, diff.x))
-        }
-      }
-
-      player.update(controller, deltaTime)
-
-      if ((!wasMouse1Down && Mouse.isButtonDown(1)) || Mouse.isButtonDown(2)) {
-        var pages = sparkSystem.allocate(sparkSystem.pageSize)
-        pages map (x => sparkSystem.updatePage(x, transformedMouse))
-        sparkSystem.deallocate(pages)
-      }
+      player.update(this, deltaTime)
 
       for (b <- bulletList) {
-        b.update(deltaTime)
+        b.update(this, deltaTime)
       }
 
       gbuf.accelerationPass {
@@ -327,7 +124,6 @@ class GS_Game extends GameState {
             val aheadPos = b.position + b.velocity * 0.08f
             drawPush(aheadPos, b.pushStrength, 50f)
           }
-          drawPush(transformedMouse, -(new Vector2(Mouse.getDX(), Mouse.getDY()).length / 5) / (deltaTime.toFloat * 300), 350f)
         accelerationShader.unbind()
         glDisable(GL_BLEND)
       }
@@ -339,15 +135,9 @@ class GS_Game extends GameState {
       bulletList = bulletList filter (_.isAlive)
     }
 
-    wasMouse0Down = Mouse.isButtonDown(0)
-    wasMouse1Down = Mouse.isButtonDown(1)
     wasKeyBDown = Keyboard.isKeyDown(Keyboard.KEY_B)
 
-    var lookAt = new Vector2(
-      mouse.x / GLFrustum.screenWidth * gameSize.x,
-      mouse.y / GLFrustum.screenHeight * gameSize.y
-    )
-    lookAt = player.position
+    var lookAt = player.position
     camera.moveTowardsCenter(lookAt, (0.25f / deltaTime).toFloat)
   }
 

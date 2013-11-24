@@ -5,6 +5,7 @@ import org.lwjgl.opengl.{
   Display, 
   DisplayMode
 }
+import org.lwjgl.input._
 
 class GS_Init extends GameState {
   def init() = {
@@ -24,6 +25,14 @@ class GS_Init extends GameState {
 
     glDisable(GL_DEPTH_TEST)
     glShadeModel(GL_SMOOTH);   // Enable smooth shading
+
+    try {
+      Controllers.create()
+    } catch {
+      case e:Exception => {}
+    }
+
+    Controllers.poll()
 
     // next next state and kill this state
     setNextState(new GS_Game)

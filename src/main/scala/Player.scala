@@ -7,13 +7,50 @@ import scala.math._
 import vectors._
 import matricies._
 
-class Player(var position:Vector2) {
+class Player(var position:Vector2, val input:Input) {
   var velocity = new Vector2(0, 0)
   val color = new Vector3(1, 1, 1)
   var angle = 0f
 
-  def update(controller:Controller, deltaTime:Double) {
-    val stick = new Vector2(controller.getXAxisValue, controller.getYAxisValue)
+  var lastFiringTime:Long = 0
+  var firingDelay = 100
+
+  def readyToFire:Boolean = {
+    if (System.currentTimeMillis - lastFiringTime > firingDelay) {
+      lastFiringTime = System.currentTimeMillis
+      return true
+    } else {
+      return false
+    }
+  }
+
+  def update(gamestate:GS_Game, deltaTime:Double) {
+    def fireBullets(angle:Double) {
+      var middle = position
+      var angles = List(-1, 0, 1)
+      for (i <- angles) {
+        var newAngle = angle + Pi / 90 * 2 * i
+        gamestate.addBullet(new Bullet(middle, new Vector2(cos(newAngle).toFloat, sin(newAngle).toFloat) * 750, newAngle.toFloat))
+      }
+    }
+
+    var mouse = new Vector2(Mouse.getX, GLFrustum.screenHeight - Mouse.getY)
+    var transformedMouse = mouse.transform(gamestate.camera.getTransforms.inverse)
+    val rightStick = new Vector2(input.getAxis("aimingX"), input.getAxis("aimingY"))
+    if (readyToFire) {
+      if (rightStick.length > 0.4) {
+        fireBullets(atan2(rightStick.y, rightStick.x))
+      }
+
+      if (Mouse.isButtonDown(0)) {
+        var middle = position
+        var mouse = transformedMouse
+        var diff = mouse - middle
+        fireBullets(atan2(diff.y, diff.x))
+      }
+    }
+
+    val stick = new Vector2(input.getAxis("movementX"), input.getAxis("movementY"))
     var acceleration = new Vector2(0, 0)
     if (stick.length > 0.5) {
       acceleration = stick.normalized * stick.length * 2000
