@@ -9,9 +9,10 @@ import vectors._
 import matricies._
 
 class Player(var position:Vector2, val input:Input) {
+  val model = new CollidableModel(Player.lineModel)
   var velocity = new Vector2(0, 0)
   val color = new Vector3(1, 1, 1)
-  var angle = 0f
+  var angle = -Pi / 2
 
   var lastFiringTime:Long = System.currentTimeMillis
   var firingDelay = 100
@@ -51,7 +52,7 @@ class Player(var position:Vector2, val input:Input) {
       for (i <- 0 until 14) {
         val pageIndex = sparkIndex / gamestate.sparkSystem.pageSize
         val sparkModPageSize = sparkIndex % gamestate.sparkSystem.pageSize
-        var angle = atan2(-velocity.y, -velocity.x).toFloat
+        var angle = atan2(-velocity.y, -velocity.x)
         val variance = 1
         angle += -(variance.toFloat / 2) + random.nextFloat() * variance
         val newVel = new Vector2(cos(angle).toFloat, sin(angle).toFloat) * velocity.length * random.nextFloat()
@@ -101,29 +102,24 @@ class Player(var position:Vector2, val input:Input) {
     position = oldPosition + oldVelocity * deltaTime.toFloat
     velocity = oldVelocity + acceleration * deltaTime.toFloat - oldVelocity * 5 * deltaTime.toFloat
 
-    angle = atan2(velocity.y, velocity.x).toFloat
+    if (velocity.length > 0) {
+      angle = atan2(velocity.y, velocity.x).toFloat
+    }
+
+    model.modelTranslationAndScale = Matrix4.translate(position) * Matrix4.scale(12, 12, 1)
+    model.modelRotation = Matrix4.rotateZ(angle.toFloat)
   }
 
   def draw() {
-    GLFrustum.pushModelview()
-      GLFrustum.modelviewMatrix.multiplyBy(Matrix4.translate(position) * Matrix4.scale(12, 12, 1) * Matrix4.rotateZ(angle))
-      Player.model.draw(color)
-    GLFrustum.popModelview()
+    model.draw(color)
   }
 }
 
 object Player {
-  val model = new LineModel(List(
+  val lineModel = new LineModel(LineModel.lineLoop(List(
     new Vector2(1, 0),
     new Vector2(-1, 0.75f),
-
-    new Vector2(-1, 0.75f),
     new Vector2(-0.5f, 0),
-
-    new Vector2(-0.5f, 0),
-    new Vector2(-1, -0.75f),
-
-    new Vector2(-1, -0.75f),
-    new Vector2(1, 0)
-  ))
+    new Vector2(-1, -0.75f)
+  )))
 }

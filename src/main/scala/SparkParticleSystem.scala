@@ -17,6 +17,8 @@ import vectors._
 class SparkParticleSystem(pageSize:Int, numPages:Int) extends ParticleSystem(pageSize, numPages) {
   val random = new Random()
 
+  fbo.newTexture("colors", GL_RGBA32F, null)
+
   val vbo = glGenBuffers()
 
   var vertexBuffer = BufferUtils.createFloatBuffer(pageSize * numPages * 3 * 2)
@@ -48,12 +50,19 @@ class SparkParticleSystem(pageSize:Int, numPages:Int) extends ParticleSystem(pag
   )
 
   def updatePage(page:Int, position:Vector2) { updatePage(page, position, new Vector2(2)) }
-  def updatePage(page:Int, position:Vector2, velocity:Vector2) { updatePage(page, position, velocity, 0, pageSize, true) }
-  def updatePage(page:Int, position:Vector2, velocity:Vector2, start:Int, end:Int, isRandom:Boolean) {
-    fbo.drawToTextures(List("positions", "velocities")) {
+  def updatePage(page:Int, position:Vector2, velocity:Vector2) { updatePage(page, position, velocity, null) }
+  def updatePage(page:Int, position:Vector2, velocity:Vector2, color:Vector3) { updatePage(page, position, velocity, color, 0, pageSize, true) }
+  def updatePage(page:Int, position:Vector2, velocity:Vector2, start:Int, end:Int, isRandom:Boolean) { updatePage(page, position, velocity, null, start, end, isRandom ) }
+  def updatePage(page:Int, position:Vector2, velocity:Vector2, color:Vector3, start:Int, end:Int, isRandom:Boolean) {
+    fbo.drawToTextures(List("positions", "velocities", "colors")) {
       setShader.bind()
         setShader.setUniform2f("uPosition", position.x, position.y)
         setShader.setUniform2f("uVelocity", velocity.x, velocity.y)
+        if (color != null) {
+          setShader.setUniform3f("uColor", color.x, color.y, color.z)
+        } else {
+          setShader.setUniform3f("uColor", 1, 0.4f, 0.05f)
+        }
         if (isRandom) {
           setShader.setUniform2f("uRandomSeed", random.nextFloat(), random.nextFloat())
           setShader.setUniform1f("uIsRandom", 1.0f)
@@ -94,8 +103,11 @@ class SparkParticleSystem(pageSize:Int, numPages:Int) extends ParticleSystem(pag
       glBindTexture(GL_TEXTURE_2D, fbo.getTexture("positions"))
       glActiveTexture(GL_TEXTURE1)
       glBindTexture(GL_TEXTURE_2D, fbo.getTexture("velocities"))
+      glActiveTexture(GL_TEXTURE2)
+      glBindTexture(GL_TEXTURE_2D, fbo.getTexture("colors"))
       program.setUniform1i("uPositionSampler", 0)
       program.setUniform1i("uVelocitySampler", 1)
+      program.setUniform1i("uColorSampler", 2)
 
       val aCoordLocation = glGetAttribLocation(program.id, "aCoord")
 

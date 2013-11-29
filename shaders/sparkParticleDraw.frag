@@ -3,8 +3,8 @@
 in vec2 texCoord;
 in float intensity;
 
-void main() {
-    vec4 final_color = vec4(1, 0.4, 0.05, 1);
+uniform sampler2D uColorSampler;
 
-    gl_FragColor = final_color * intensity;
+void main() {
+    gl_FragColor = texture2D(uColorSampler, texCoord) * intensity;
 }

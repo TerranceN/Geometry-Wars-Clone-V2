@@ -6,6 +6,7 @@ import org.lwjgl.opengl.GL20._
 import org.lwjgl.BufferUtils
 
 import vectors._
+import matricies._
 import shaders._
 
 class LineModel(points:List[Vector2]) {
@@ -47,5 +48,11 @@ class LineModel(points:List[Vector2]) {
 
       glDisableVertexAttribArray(aCoordLocation)
     primitiveShader.unbind()
+  }
+}
+object LineModel {
+  def lineLoop(points:List[Vector2]):List[Vector2] = {
+    val newPoints = points flatMap { x => List(x, x) }
+    return newPoints.tail ::: List(newPoints.head)
   }
 }

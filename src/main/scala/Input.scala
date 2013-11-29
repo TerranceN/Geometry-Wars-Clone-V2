@@ -35,9 +35,15 @@ class MouseButton(val button:Int) extends InputButton {
 }
 
 class ControllerButton(val controllerIndex:Int, val button:Int) extends InputButton {
+  def controllerPluggedIn = Controllers.getControllerCount() > controllerIndex
+
   def getButton():ButtonState = {
-    if (Controllers.getController(controllerIndex).isButtonPressed(button)) {
-      return Pressed
+    if (controllerPluggedIn) {
+      if (Controllers.getController(controllerIndex).isButtonPressed(button)) {
+        return Pressed
+      } else {
+        return Released
+      }
     } else {
       return Released
     }
@@ -89,8 +95,14 @@ class KeyboardAxis(lowKey:Int, highKey:Int) extends InputAxis {
 }
 
 class ControllerAxis(val controllerIndex:Int, val axis:Int) extends InputAxis {
+  def controllerPluggedIn = Controllers.getControllerCount() > controllerIndex
+
   def getAxisValue():Float = {
-    return (Controllers.getController(controllerIndex).getAxisValue(axis))
+    if (controllerPluggedIn) {
+      return (Controllers.getController(controllerIndex).getAxisValue(axis))
+    } else {
+      return 0
+    }
   }
 }
 
@@ -113,5 +125,12 @@ class Input(var buttonDict:Map[String, InputButton], var axisDict:Map[String, In
 
   def getButton(name:String):ButtonState = {
     return buttonDict(name).getButton
+  }
+
+  def ifPressed(name:String)(f: => Unit) {
+    getButton(name) match {
+      case Pressed => f
+      case Released => {}
+    }
   }
 }

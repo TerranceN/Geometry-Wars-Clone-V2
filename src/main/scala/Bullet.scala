@@ -4,11 +4,13 @@ import vectors._
 import matricies._
 
 class Bullet(var position:Vector2, var velocity:Vector2, val angle:Float) {
+  var model = new CollidableModel(Bullet.lineModel)
   var timeAlive:Float = 0
   var pushStrength:Float = 0
   var isAlive = true
   val timeToMax = 0.25f
   val color = new Vector3(1, 1, 0)
+  model.modelRotation = Matrix4.rotateZ(angle)
   def update(gamestate:GS_Game, deltaTime:Double) {
     if (isAlive) {
       if (timeAlive < timeToMax) {
@@ -22,28 +24,32 @@ class Bullet(var position:Vector2, var velocity:Vector2, val angle:Float) {
 
       if (position.x < 0 || position.y < 0 || position.x > gamestate.gameSize.x || position.y > gamestate.gameSize.y) {
         isAlive = false
-        var pages = gamestate.sparkSystem.allocate(gamestate.sparkSystem.pageSize)
-        pages map (x => gamestate.sparkSystem.updatePage(x, position, velocity))
-        gamestate.sparkSystem.deallocate(pages)
+      }
+
+      for (enemy <- gamestate.enemyList) {
+        if (enemy.model.isCollidingWith(model)) {
+          isAlive = false
+          enemy.isAlive = false
+          enemy.velocity += velocity
+        }
       }
     }
+    model.modelTranslationAndScale = Matrix4.translate(position) * Matrix4.scale(5, 5, 1)
   }
   def draw() {
-    GLFrustum.pushModelview()
-      GLFrustum.modelviewMatrix.multiplyBy(Matrix4.translate(position) * Matrix4.scale(5, 5, 1) * Matrix4.rotateZ(angle))
-      Bullet.model.draw(color)
-    GLFrustum.popModelview()
+    model.draw(color)
   }
 }
 object Bullet {
-  val model = new LineModel(List(
+  val lineModel = new LineModel(LineModel.lineLoop(List(
     new Vector2(1, 0),
     new Vector2(-1, 0.75f),
-
-    new Vector2(-1, 0.75f),
-    new Vector2(-1, -0.75f),
-
-    new Vector2(-1, -0.75f),
-    new Vector2(1, 0)
-  ))
+    new Vector2(-1, -0.75f)
+  )))
+  //val lineModel = new LineModel(LineModel.lineLoop(List(
+  //  new Vector2(-1, -1),
+  //  new Vector2( 1, -1),
+  //  new Vector2( 1,  1),
+  //  new Vector2(-1,  1)
+  //)))
 }

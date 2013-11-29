@@ -30,5 +30,5 @@ libraryDependencies ++= Seq(
   "org.lwjgl.lwjgl" % "lwjgl" % "2.9.0",
   "org.lwjgl.lwjgl" % "lwjgl_util" % "2.9.0",
   "org.lwjgl.lwjgl" % "lwjgl-platform" % "2.9.0" classifier "natives-windows" classifier "natives-linux" classifier "natives-osx",
-  "net.java.jinput" % "jinput-platform" % "2.0.5"
+  "net.java.jinput" % "jinput-platform" % "2.0.5" classifier "natives-windows" classifier "natives-linux" classifier "natives-osx"
 )

@@ -13,6 +13,7 @@ import org.lwjgl.opengl.{
 import org.lwjgl.BufferUtils
 import org.lwjgl.input._
 import scala.math._
+import scala.util.Random
 import org.lwjgl.util.glu.GLU._
 
 import textures._
@@ -21,7 +22,7 @@ import vectors._
 import matricies._
 
 class GS_Game extends GameState {
-  val sparkSystem = new SparkParticleSystem(250, 50)
+  val sparkSystem = new SparkParticleSystem(200, 100)
   var gameSize = new Vector2(2000, 2000)
   var camera = new Camera()
 
@@ -30,10 +31,13 @@ class GS_Game extends GameState {
 
   var wasKeyBDown = false
 
+  Console.println(Controllers.getControllerCount)
+
   var input = new Input(
     Map(
       "pause" -> new CombinationButton(new ControllerButton(0, 7), new KeyboardButton(Keyboard.KEY_ESCAPE)),
-      "pauseGame" -> new CombinationButton(new ControllerButton(0, 0), new KeyboardButton(Keyboard.KEY_P))
+      "pauseGame" -> new CombinationButton(new ControllerButton(0, 0), new KeyboardButton(Keyboard.KEY_P)),
+      "spawnEnemies" -> new CombinationButton(new ControllerButton(0, 1), new KeyboardButton(Keyboard.KEY_R))
     ),
     Map(
       "movementY" -> new CombinationAxis(new ControllerAxis(0, 0), new KeyboardAxis(Keyboard.KEY_W, Keyboard.KEY_S)),
@@ -44,12 +48,14 @@ class GS_Game extends GameState {
     )
   )
   var player = new Player(gameSize / 2, input)
+  var enemyList:List[Enemy] = List(new Enemy(new Vector2(0)))
+  var bulletList:List[Bullet] = Nil
+
+  var random = new Random()
 
   var pushTexture = new Texture("assets/push.png")
 
   var bloomEnabled = true
-
-  var controller:Controller = null;
 
   val accelerationShader = new ShaderProgram(
     new VertexShader("shaders/test.vert"),
@@ -73,8 +79,6 @@ class GS_Game extends GameState {
 
   var boundary = new Boundary(camera, gameSize, 20)
 
-  var bulletList:List[Bullet] = Nil
-
   var gbuf = new GBuffer()
   gbuf.setup(gameSize.x.toInt, gameSize.y.toInt, 161, 161)
 
@@ -85,15 +89,6 @@ class GS_Game extends GameState {
     bloomFBO = new Framebuffer(screenFBO.fboWidth, screenFBO.fboHeight)
     bloomFBO.newTexture("bloom", GL_RGBA, null)
     bloomFBO.newTexture("bloom_halfblur", GL_RGBA, null)
-
-    controller = Controllers.getController(0)
-
-    for (i <- 0 until controller.getAxisCount()) {
-      Console.println(i + ": " + controller.getAxisName(i))
-    }
-    for (i <- 0 until controller.getButtonCount()) {
-      Console.println(i + ": " + controller.getButtonName(i))
-    }
   }
 
   def addBullet(b:Bullet) {
@@ -115,19 +110,21 @@ class GS_Game extends GameState {
       bloomEnabled = !bloomEnabled
     }
 
-    input.getButton("pause") match {
-      case ButtonState.Pressed => killState
-      case _ => {}
+    input.ifPressed("pause") {
+      killState
+    }
+
+    input.ifPressed("spawnEnemies") {
+      enemyList = new Enemy(new Vector2(random.nextFloat, random.nextFloat) * new Vector2(GLFrustum.screenWidth, GLFrustum.screenHeight)) :: enemyList
     }
 
     input.getButton("pauseGame") match {
       case ButtonState.Pressed => {}
       case ButtonState.Released => {
         player.update(this, deltaTime)
+        enemyList map (_.update(this, deltaTime))
 
-        for (b <- bulletList) {
-          b.update(this, deltaTime)
-        }
+        bulletList map (_.update(this, deltaTime))
 
         gbuf.accelerationPass {
           glEnable(GL_BLEND)
@@ -150,7 +147,18 @@ class GS_Game extends GameState {
 
         sparkSystem.update(deltaTime, gameSize)
 
+        bulletList filter (!_.isAlive) map { bullet =>
+          var pages = sparkSystem.allocate(sparkSystem.pageSize)
+          pages map (x => sparkSystem.updatePage(x, bullet.position, bullet.velocity))
+          sparkSystem.deallocate(pages)
+        }
         bulletList = bulletList filter (_.isAlive)
+        enemyList filter (!_.isAlive) map { enemy =>
+          var pages = sparkSystem.allocate(sparkSystem.pageSize * 2)
+          pages map (x => sparkSystem.updatePage(x, enemy.position, enemy.velocity, enemy.color))
+          sparkSystem.deallocate(pages)
+        }
+        enemyList = enemyList filter (_.isAlive)
       }
     }
 
@@ -188,6 +196,7 @@ class GS_Game extends GameState {
     screenFBO.drawToTextures(List("scene")) {
       glClear(GL_COLOR_BUFFER_BIT)
       gbuf.draw()
+      enemyList map (_.draw())
       player.draw()
       bulletList map (_.draw())
       sparkSystem.draw()
