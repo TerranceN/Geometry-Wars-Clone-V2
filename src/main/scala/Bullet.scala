@@ -29,12 +29,15 @@ class Bullet(var position:Vector2, var velocity:Vector2, val angle:Float) {
       for (enemy <- gamestate.enemyList) {
         if (enemy.model.isCollidingWith(model)) {
           isAlive = false
-          enemy.isAlive = false
-          enemy.velocity += velocity
+          enemy.kill()
+          if (!enemy.isAlive) {
+            enemy.velocity += velocity / 2
+          }
         }
       }
     }
-    model.modelTranslationAndScale = Matrix4.translate(position) * Matrix4.scale(5, 5, 1)
+    model.modelTranslation = Matrix4.translate(position)
+    model.modelScale = Matrix4.scale(5, 5, 1)
   }
   def draw() {
     model.draw(color)

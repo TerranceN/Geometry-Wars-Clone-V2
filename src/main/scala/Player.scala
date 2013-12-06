@@ -13,14 +13,15 @@ class Player(var position:Vector2, val input:Input) {
   var velocity = new Vector2(0, 0)
   val color = new Vector3(1, 1, 1)
   var angle = -Pi / 2
+  var isAlive = true
 
   var lastFiringTime:Long = System.currentTimeMillis
   var firingDelay = 100
 
   var lastSparkTime:Long = System.currentTimeMillis
-  var sparkDelay = 10
+  var sparkDelay = 5
   var sparkPages:List[Int] = null
-  var numSparksAllocated = 500
+  var numSparksAllocated = 1000
   var sparkIndex:Int = 0
   var random = new Random()
 
@@ -55,7 +56,7 @@ class Player(var position:Vector2, val input:Input) {
         var angle = atan2(-velocity.y, -velocity.x)
         val variance = 1
         angle += -(variance.toFloat / 2) + random.nextFloat() * variance
-        val newVel = new Vector2(cos(angle).toFloat, sin(angle).toFloat) * velocity.length * random.nextFloat()
+        val newVel = new Vector2(cos(angle).toFloat, sin(angle).toFloat) * velocity.length / 2 * random.nextFloat()
         gamestate.sparkSystem.updatePage(sparkPages(pageIndex), position, newVel, sparkModPageSize, sparkModPageSize + 1, false)
         sparkIndex = (sparkIndex + 1) % numSparksAllocated
       }
@@ -65,7 +66,7 @@ class Player(var position:Vector2, val input:Input) {
       var angles = List(-1, 0, 1)
       for (i <- angles) {
         var newAngle = angle + Pi / 90 * 2 * i
-        gamestate.addBullet(new Bullet(middle, new Vector2(cos(newAngle).toFloat, sin(newAngle).toFloat) * 750, newAngle.toFloat))
+        gamestate.addBullet(new Bullet(middle, new Vector2(cos(newAngle).toFloat, sin(newAngle).toFloat) * 1000, newAngle.toFloat))
       }
     }
 
@@ -106,7 +107,8 @@ class Player(var position:Vector2, val input:Input) {
       angle = atan2(velocity.y, velocity.x).toFloat
     }
 
-    model.modelTranslationAndScale = Matrix4.translate(position) * Matrix4.scale(12, 12, 1)
+    model.modelTranslation = Matrix4.translate(position) 
+    model.modelScale = Matrix4.scale(12, 12, 1)
     model.modelRotation = Matrix4.rotateZ(angle.toFloat)
   }
 

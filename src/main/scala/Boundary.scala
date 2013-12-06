@@ -9,7 +9,7 @@ import shaders._
 import vectors._
 
 class Boundary(val camera:Camera, val gameSize:Vector2, val padding:Float) {
-  camera.setBoundaries(new Vector2(-padding), gameSize - new Vector2(GLFrustum.screenWidth, GLFrustum.screenHeight) + new Vector2(padding))
+  camera.setBoundaries(new Vector2(-padding), gameSize + new Vector2(padding))
 
   val primitiveShader = new ShaderProgram(
     new VertexShader("shaders/primitiveWithColor.vert"),
@@ -36,26 +36,27 @@ class Boundary(val camera:Camera, val gameSize:Vector2, val padding:Float) {
   }
 
   def initBlackedOutAreasVBO() {
+    var blackPadding = gameSize.length()
     val buffer = BufferUtils.createFloatBuffer(4 * 4 * 2)
-    buffer.put(-padding); buffer.put(-padding)
+    buffer.put(-blackPadding); buffer.put(-blackPadding)
     buffer.put(0); buffer.put(0)
     buffer.put(gameSize.x); buffer.put(0)
-    buffer.put(gameSize.x + padding); buffer.put(-padding)
+    buffer.put(gameSize.x + blackPadding); buffer.put(-blackPadding)
 
-    buffer.put(gameSize.x + padding); buffer.put(-padding)
+    buffer.put(gameSize.x + blackPadding); buffer.put(-blackPadding)
     buffer.put(gameSize.x); buffer.put(0)
     buffer.put(gameSize.x); buffer.put(gameSize.y)
-    buffer.put(gameSize.x + padding); buffer.put(gameSize.y + padding)
+    buffer.put(gameSize.x + blackPadding); buffer.put(gameSize.y + blackPadding)
 
-    buffer.put(gameSize.x + padding); buffer.put(gameSize.y + padding)
+    buffer.put(gameSize.x + blackPadding); buffer.put(gameSize.y + blackPadding)
     buffer.put(gameSize.x); buffer.put(gameSize.y)
     buffer.put(0); buffer.put(gameSize.y)
-    buffer.put(-padding); buffer.put(gameSize.y + padding)
+    buffer.put(-blackPadding); buffer.put(gameSize.y + blackPadding)
 
-    buffer.put(-padding); buffer.put(gameSize.y + padding)
+    buffer.put(-blackPadding); buffer.put(gameSize.y + blackPadding)
     buffer.put(0); buffer.put(gameSize.y)
     buffer.put(0); buffer.put(0)
-    buffer.put(-padding); buffer.put(-padding)
+    buffer.put(-blackPadding); buffer.put(-blackPadding)
 
     buffer.flip()
 

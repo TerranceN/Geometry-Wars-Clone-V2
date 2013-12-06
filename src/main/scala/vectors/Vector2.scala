@@ -15,6 +15,9 @@ class Vector2(var x:Float, var y:Float) {
   def /(scale:Float):Vector2 = this * (1 / scale)
   def dot(other:Vector2):Float = x*other.x + y*other.y
   def length():Float = sqrt(x*x + y*y).toFloat
+  def lengthSquared():Float = x*x + y*y
+  def proj(other:Vector2):Vector2 = other * (this.dot(other) / other.lengthSquared())
+  def perp(other:Vector2):Vector2 = this - this.proj(other)
   def normalized():Vector2 = {
     val l = length()
     if (l > 0) {
@@ -29,5 +32,8 @@ class Vector2(var x:Float, var y:Float) {
   }
   def transform(m:Matrix4):Vector2 = {
     return new Vector4(x, y, 0, 1).transform(m).xy
+  }
+  def transformAsVector(m:Matrix4):Vector2 = {
+    return new Vector4(x, y, 0, 0).transform(m).xy
   }
 }

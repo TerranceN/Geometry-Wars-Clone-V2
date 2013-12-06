@@ -17,7 +17,7 @@ import vectors._
 class SparkParticleSystem(pageSize:Int, numPages:Int) extends ParticleSystem(pageSize, numPages) {
   val random = new Random()
 
-  fbo.newTexture("colors", GL_RGBA32F, null)
+  fbo.newTexture("colors", GL_RGB, null)
 
   val vbo = glGenBuffers()
 
@@ -61,7 +61,7 @@ class SparkParticleSystem(pageSize:Int, numPages:Int) extends ParticleSystem(pag
         if (color != null) {
           setShader.setUniform3f("uColor", color.x, color.y, color.z)
         } else {
-          setShader.setUniform3f("uColor", 1, 0.4f, 0.05f)
+          setShader.setUniform3f("uColor", 1, 0.5f, 0.05f)
         }
         if (isRandom) {
           setShader.setUniform2f("uRandomSeed", random.nextFloat(), random.nextFloat())

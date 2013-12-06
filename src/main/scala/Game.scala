@@ -7,6 +7,7 @@ import org.lwjgl.opengl.{
 }
 import org.lwjgl.input.Keyboard
 import Keyboard._
+import scala.math._
 import scala.collection.mutable.Stack
 import scala.collection.mutable.Queue
 
@@ -55,7 +56,7 @@ object Game extends App {
             startTime = System.nanoTime
             val currentState = gameStates.head
             // update the current state
-            currentState.update(averageUpdateTime)
+            currentState.update(min(averageUpdateTime, 0.017))
 
             // if that update caused the state to die, remove to from the stack
             // otherwise, draw the state

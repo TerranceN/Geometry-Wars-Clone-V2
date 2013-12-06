@@ -9,7 +9,7 @@ import vectors._
 import matricies._
 import shaders._
 
-class LineModel(points:List[Vector2]) {
+class LineModel(val points:List[Vector2]) {
   val numPoints = points.length
   val vbo = glGenBuffers()
   initVBO()

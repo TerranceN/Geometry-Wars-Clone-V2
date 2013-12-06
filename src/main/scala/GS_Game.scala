@@ -22,7 +22,7 @@ import vectors._
 import matricies._
 
 class GS_Game extends GameState {
-  val sparkSystem = new SparkParticleSystem(200, 100)
+  val sparkSystem = new SparkParticleSystem(100, 100)
   var gameSize = new Vector2(2000, 2000)
   var camera = new Camera()
 
@@ -48,7 +48,7 @@ class GS_Game extends GameState {
     )
   )
   var player = new Player(gameSize / 2, input)
-  var enemyList:List[Enemy] = List(new Enemy(new Vector2(0)))
+  var enemyList:List[Enemy] = List(new SnakeEnemySegment(new Vector2(0)))
   var bulletList:List[Bullet] = Nil
 
   var random = new Random()
@@ -78,6 +78,8 @@ class GS_Game extends GameState {
   )
 
   var boundary = new Boundary(camera, gameSize, 20)
+
+  var waveNumber = 0
 
   var gbuf = new GBuffer()
   gbuf.setup(gameSize.x.toInt, gameSize.y.toInt, 161, 161)
@@ -114,15 +116,75 @@ class GS_Game extends GameState {
       killState
     }
 
+    def getSpawnPosition():Vector2 = {
+      val axis = random.nextBoolean()
+      val side = random.nextInt(2)
+      val randomDistance = random.nextFloat
+      var newPosition = new Vector2(0)
+      axis match {
+        case false => {
+          newPosition = new Vector2(side, randomDistance) * gameSize
+        }
+        case true => {
+          newPosition = new Vector2(randomDistance, side) * gameSize
+        }
+      }
+
+      return newPosition
+    }
+
+    def spawnSnake() {
+      enemyList = new SnakeEnemySegment(getSpawnPosition) :: enemyList
+    }
+
+    def spawnGreenFollower() {
+      enemyList = new BasicEnemy(getSpawnPosition) :: enemyList
+    }
+
     input.ifPressed("spawnEnemies") {
-      enemyList = new Enemy(new Vector2(random.nextFloat, random.nextFloat) * new Vector2(GLFrustum.screenWidth, GLFrustum.screenHeight)) :: enemyList
+      spawnGreenFollower()
+    }
+
+    if (enemyList.isEmpty && player.isAlive) {
+      for (i <- 0 until 5 + waveNumber * 1) {
+        spawnGreenFollower()
+      }
+      spawnSnake()
+      spawnSnake()
+      spawnSnake()
+      waveNumber += 1
+    }
+
+    if (!player.isAlive) {
+      player.position = gameSize / 2
+      player.velocity = new Vector2(0)
+      player.angle = -Pi / 2
+      player.isAlive = true
+      waveNumber = 0
+      spawnGreenFollower()
     }
 
     input.getButton("pauseGame") match {
       case ButtonState.Pressed => {}
       case ButtonState.Released => {
         player.update(this, deltaTime)
-        enemyList map (_.update(this, deltaTime))
+
+        def seperateEnemies(eList:List[Enemy]):Unit = eList match {
+          case List() => {}
+          case (e::es) => {
+            for (other <- es) {
+              if (e.model.isCollidingWith(other.model)) {
+                e.handleCollisionWithEnemy(other, deltaTime)
+                other.handleCollisionWithEnemy(e, deltaTime)
+              }
+            }
+            seperateEnemies(es)
+          }
+        }
+
+        seperateEnemies(enemyList)
+
+        enemyList map (_.updateEnemy(this, deltaTime))
 
         bulletList map (_.update(this, deltaTime))
 
@@ -134,9 +196,13 @@ class GS_Game extends GameState {
             pushTexture.bind()
             accelerationShader.setUniform1i("uPushSampler", 0)
 
-            bulletList.zipWithIndex.foreach{ case (b, i) =>
+            bulletList map { b =>
               val aheadPos = b.position + b.velocity * 0.08f
               drawPush(aheadPos, b.pushStrength, 50f)
+            }
+            enemyList map { e =>
+              val aheadPos = e.position + e.velocity * 0.02f
+              drawPush(aheadPos, e.velocity.length / 400, 15f + e.velocity.length / 25)
             }
             drawPush(player.position, player.velocity.length / 400, 15f + player.velocity.length / 25)
           accelerationShader.unbind()
@@ -154,7 +220,7 @@ class GS_Game extends GameState {
         }
         bulletList = bulletList filter (_.isAlive)
         enemyList filter (!_.isAlive) map { enemy =>
-          var pages = sparkSystem.allocate(sparkSystem.pageSize * 2)
+          var pages = sparkSystem.allocate(sparkSystem.pageSize * 4)
           pages map (x => sparkSystem.updatePage(x, enemy.position, enemy.velocity, enemy.color))
           sparkSystem.deallocate(pages)
         }
